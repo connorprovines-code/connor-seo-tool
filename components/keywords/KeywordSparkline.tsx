@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 
 interface MonthlySearch {
@@ -14,7 +15,13 @@ interface KeywordSparklineProps {
 }
 
 export function KeywordSparkline({ data, className = '' }: KeywordSparklineProps) {
-  if (!data || data.length === 0) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted || !data || data.length === 0) {
     return null
   }
 
