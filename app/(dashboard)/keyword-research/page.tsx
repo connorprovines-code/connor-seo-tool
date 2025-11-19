@@ -106,6 +106,7 @@ export default function KeywordResearchPage() {
       }
 
       const similarData = await similarRes.json()
+      console.log('Similar keywords API response:', similarData)
 
       // Parse metrics
       let metrics = {
