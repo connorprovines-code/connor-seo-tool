@@ -37,15 +37,29 @@ export async function POST(request: NextRequest) {
     // Find domain's ranking
     let position = null
     let rankUrl = null
+    let rankTitle = null
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item.url && item.url.includes(domain.replace(/^https?:\/\//, '').replace(/\/$/, ''))) {
         position = item.rank_absolute
         rankUrl = item.url
+        rankTitle = item.title
         break
       }
     }
+
+    // Extract top 10 organic results for comparison
+    const topResults = items
+      .filter((item: any) => item.type === 'organic')
+      .slice(0, 10)
+      .map((item: any) => ({
+        position: item.rank_absolute,
+        url: item.url,
+        domain: item.domain,
+        title: item.title,
+        description: item.description,
+      }))
 
     // Track API usage
     await supabase.from('api_usage').insert({
@@ -61,8 +75,10 @@ export async function POST(request: NextRequest) {
       domain,
       position,
       rankUrl,
+      rankTitle,
       totalResults: items.length,
       serpFeatures: result.tasks[0].result[0]?.se_results_count || 0,
+      topResults,
     })
   } catch (error: any) {
     console.error('Rank check error:', error)

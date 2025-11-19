@@ -27,17 +27,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get keyword ideas (related keywords)
-    const ideasResult = await dataForSEO.getKeywordIdeas(keyword, locationCode)
+    // Get similar keywords using DataForSEO Labs (better than Google Ads endpoint)
+    const ideasResult = await dataForSEO.getSimilarKeywords(keyword, locationCode, Math.min(limit, 1000))
+
+    console.log('DataForSEO Labs keyword ideas response:', JSON.stringify(ideasResult, null, 2))
 
     if (!ideasResult.tasks || !ideasResult.tasks[0]?.result) {
+      console.error('No keyword ideas found in response:', ideasResult)
       return NextResponse.json(
-        { error: 'No keyword ideas found' },
+        { error: 'No keyword ideas found', debug: ideasResult },
         { status: 500 }
       )
     }
 
     const ideas = ideasResult.tasks[0].result[0]?.items || []
+    console.log(`Found ${ideas.length} keyword ideas for "${keyword}"`)
+
     const limitedIdeas = ideas.slice(0, limit)
 
     // If SERP data is requested, fetch rankings for each keyword
@@ -108,8 +113,13 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Similar keywords error:', error)
+    console.error('Error stack:', error.stack)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch similar keywords' },
+      {
+        error: error.message || 'Failed to fetch similar keywords',
+        details: error.toString(),
+        stack: error.stack
+      },
       { status: 500 }
     )
   }
