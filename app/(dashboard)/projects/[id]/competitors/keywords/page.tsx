@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/hooks/use-toast'
-import { Search, Loader2, ExternalLink, TrendingUp } from 'lucide-react'
+import { Search, Loader2, ExternalLink, TrendingUp, Target, Plus } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface CompetitorKeywordsPageProps {
   params: Promise<{
@@ -32,9 +33,17 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
   const { id: projectId } = use(params)
   const [domain, setDomain] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingGap, setLoadingGap] = useState(false)
   const [keywords, setKeywords] = useState<CompetitorKeyword[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [analyzedDomain, setAnalyzedDomain] = useState('')
+  const [gapAnalysis, setGapAnalysis] = useState<{
+    gaps: CompetitorKeyword[]
+    overlaps: CompetitorKeyword[]
+    yourKeywordsCount: number
+    competitorKeywordsCount: number
+  } | null>(null)
+  const [addingKeyword, setAddingKeyword] = useState<string | null>(null)
 
   const handleAnalyze = async () => {
     if (!domain.trim()) {
@@ -47,6 +56,7 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
     }
 
     setLoading(true)
+    setGapAnalysis(null) // Reset gap analysis when analyzing new domain
 
     try {
       const response = await fetch('/api/dataforseo/keywords-for-site', {
@@ -80,6 +90,102 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGapAnalysis = async () => {
+    if (!analyzedDomain) {
+      toast({
+        title: 'Error',
+        description: 'Please analyze a domain first',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setLoadingGap(true)
+
+    try {
+      const response = await fetch('/api/dataforseo/keyword-gap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          competitorDomain: analyzedDomain,
+          limit: 200,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to perform gap analysis')
+      }
+
+      const data = await response.json()
+      setGapAnalysis({
+        gaps: data.gaps || [],
+        overlaps: data.overlaps || [],
+        yourKeywordsCount: data.your_keywords_count || 0,
+        competitorKeywordsCount: data.competitor_keywords_count || 0,
+      })
+
+      toast({
+        title: 'Gap Analysis Complete',
+        description: `Found ${data.gaps_count} keyword opportunities`,
+      })
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to perform gap analysis',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingGap(false)
+    }
+  }
+
+  const handleAddKeyword = async (keyword: string, searchVolume: number, difficulty: number | null, cpc: number) => {
+    setAddingKeyword(keyword)
+
+    try {
+      const response = await fetch('/api/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          keyword,
+          search_volume: searchVolume,
+          keyword_difficulty: difficulty,
+          cpc,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to add keyword')
+      }
+
+      toast({
+        title: 'Keyword Added',
+        description: `"${keyword}" added to your tracking`,
+      })
+
+      // Refresh gap analysis to remove this keyword from gaps
+      if (gapAnalysis) {
+        setGapAnalysis({
+          ...gapAnalysis,
+          gaps: gapAnalysis.gaps.filter(k => k.keyword !== keyword),
+          yourKeywordsCount: gapAnalysis.yourKeywordsCount + 1,
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add keyword',
+        variant: 'destructive',
+      })
+    } finally {
+      setAddingKeyword(null)
     }
   }
 
@@ -142,16 +248,198 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
               <div>
                 <CardTitle>Keywords for {analyzedDomain}</CardTitle>
                 <CardDescription>
-                  Showing {keywords.length.toLocaleString()} of {totalCount.toLocaleString()} total keywords
+                  {gapAnalysis
+                    ? `Comparing ${gapAnalysis.yourKeywordsCount} your keywords vs ${gapAnalysis.competitorKeywordsCount} competitor keywords`
+                    : `Showing ${keywords.length.toLocaleString()} of ${totalCount.toLocaleString()} total keywords`
+                  }
                 </CardDescription>
               </div>
-              <Badge variant="outline" className="text-sm">
-                {totalCount.toLocaleString()} keywords
-              </Badge>
+              <div className="flex items-center gap-2">
+                {!gapAnalysis && (
+                  <Button
+                    onClick={handleGapAnalysis}
+                    disabled={loadingGap}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {loadingGap ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Target className="h-4 w-4 mr-2" />
+                        Compare to My Keywords
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Badge variant="outline" className="text-sm">
+                  {totalCount.toLocaleString()} keywords
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {keywords.length > 0 ? (
+            {gapAnalysis ? (
+              <Tabs defaultValue="gaps" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="gaps">
+                    Keyword Gaps ({gapAnalysis.gaps.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="overlaps">
+                    Both Rank ({gapAnalysis.overlaps.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="gaps" className="mt-4">
+                  {gapAnalysis.gaps.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                        <p className="text-sm text-blue-900">
+                          <Target className="h-4 w-4 inline mr-1" />
+                          <strong>{gapAnalysis.gaps.length} keyword opportunities</strong> - Your competitor ranks for these, but you don't track them yet
+                        </p>
+                      </div>
+                      {gapAnalysis.gaps.map((kw, idx) => (
+                        <Card key={idx} className="p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-sm">{kw.keyword}</h4>
+                                {kw.keyword_difficulty !== null && (
+                                  <Badge variant="outline" className={`text-xs h-5 px-1.5 ${getDifficultyColor(kw.keyword_difficulty)}`}>
+                                    KD: {kw.keyword_difficulty}
+                                  </Badge>
+                                )}
+                                {kw.position && (
+                                  <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                                    Competitor: #{kw.position}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-3 text-xs text-gray-500 mb-1">
+                                <span className="font-medium text-blue-600">{kw.search_volume.toLocaleString()} vol</span>
+                                {kw.competition && (
+                                  <span className="capitalize">{kw.competition}</span>
+                                )}
+                                {kw.cpc > 0 && <span>${kw.cpc.toFixed(2)} CPC</span>}
+                                {kw.etv > 0 && (
+                                  <span className="text-green-600 font-medium">
+                                    ${kw.etv.toFixed(0)}/mo value
+                                  </span>
+                                )}
+                              </div>
+                              {kw.title && (
+                                <p className="text-xs text-gray-600 truncate mb-1">{kw.title}</p>
+                              )}
+                              {kw.url && (
+                                <a
+                                  href={kw.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate"
+                                >
+                                  {kw.url}
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </a>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddKeyword(kw.keyword, kw.search_volume, kw.keyword_difficulty, kw.cpc)}
+                              disabled={addingKeyword === kw.keyword}
+                              className="h-7 px-3 flex-shrink-0"
+                            >
+                              {addingKeyword === kw.keyword ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <Plus className="h-3.5 w-3.5 mr-1" />
+                                  Track
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="font-medium mb-1">No keyword gaps found!</p>
+                      <p className="text-sm">You're already tracking all the keywords your competitor ranks for</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="overlaps" className="mt-4">
+                  {gapAnalysis.overlaps.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                        <p className="text-sm text-green-900">
+                          <TrendingUp className="h-4 w-4 inline mr-1" />
+                          <strong>{gapAnalysis.overlaps.length} shared keywords</strong> - Both you and your competitor rank for these
+                        </p>
+                      </div>
+                      {gapAnalysis.overlaps.map((kw, idx) => (
+                        <Card key={idx} className="p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-sm">{kw.keyword}</h4>
+                                {kw.keyword_difficulty !== null && (
+                                  <Badge variant="outline" className={`text-xs h-5 px-1.5 ${getDifficultyColor(kw.keyword_difficulty)}`}>
+                                    KD: {kw.keyword_difficulty}
+                                  </Badge>
+                                )}
+                                {kw.position && (
+                                  <Badge variant="default" className="text-xs h-5 px-1.5">
+                                    Competitor: #{kw.position}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-3 text-xs text-gray-500 mb-1">
+                                <span>{kw.search_volume.toLocaleString()} vol</span>
+                                {kw.competition && (
+                                  <span className="capitalize">{kw.competition}</span>
+                                )}
+                                {kw.cpc > 0 && <span>${kw.cpc.toFixed(2)} CPC</span>}
+                                {kw.etv > 0 && (
+                                  <span className="text-green-600">
+                                    ${kw.etv.toFixed(0)}/mo value
+                                  </span>
+                                )}
+                              </div>
+                              {kw.title && (
+                                <p className="text-xs text-gray-600 truncate mb-1">{kw.title}</p>
+                              )}
+                              {kw.url && (
+                                <a
+                                  href={kw.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate"
+                                >
+                                  {kw.url}
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>No overlapping keywords found</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            ) : keywords.length > 0 ? (
               <div className="space-y-2">
                 {keywords.map((kw, idx) => (
                   <Card key={idx} className="p-3">
