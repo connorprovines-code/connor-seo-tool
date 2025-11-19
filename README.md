@@ -1,7 +1,13 @@
 # Connor's SEO Tool - Project Specification
 
 ## Overview
-Build a comprehensive SEO management dashboard that allows users to track keyword rankings, analyze competitors, monitor backlinks, and manage multiple website projects. This is a **Next.js + Supabase** application with modern best practices.
+Build a **comprehensive SEO management dashboard** - a lightweight Ahrefs alternative that replaces expensive SEO tools by leveraging DataForSEO API for keyword research, rank tracking, backlink monitoring, and competitor analysis. This is a **Next.js + Supabase** application designed to give you complete visibility into your website's SEO performance with:
+- Real-time keyword rankings and search volume data
+- Historical ranking trends across all your websites
+- Backlink discovery and outreach automation
+- Google Search Console integration for verified data
+- AI-powered chat assistant for SEO insights
+- All in one unified dashboard
 
 ## Technology Stack
 
@@ -82,25 +88,58 @@ Build a comprehensive SEO management dashboard that allows users to track keywor
 - Estimated traffic comparison
 - Identify competitor content opportunities
 
-### 6. Backlink Monitoring
-- Backlink profile overview (total backlinks, referring domains)
-- New and lost backlinks tracking
-- Domain authority/rating metrics
-- Anchor text distribution
-- Top referring domains
-- Toxic backlink detection
-- Backlink growth over time charts
+### 6. Backlink Monitoring & Outreach
+- **Backlink Monitoring**:
+  - Backlink profile overview (total backlinks, referring domains)
+  - New and lost backlinks tracking
+  - Domain authority/rating metrics
+  - Anchor text distribution
+  - Top referring domains
+  - Toxic backlink detection
+  - Backlink growth over time charts
+- **Backlink Outreach Builder**:
+  - Discover potential backlink opportunities via DataForSEO
+  - Research relevant websites in your niche
+  - Find contact information (email scraping or manual entry)
+  - Generate personalized outreach email templates
+  - Track outreach campaigns (pending, contacted, responded, success)
+  - Webhook integration for email sending (can integrate with SendGrid, Mailgun, Resend, or custom webhook)
+  - Automated follow-up sequences
+  - Response tracking and management
+  - Success metrics (conversion rate, acquired backlinks)
 
-### 7. Google Search Console Integration
-- OAuth2 integration with Google Search Console
-- Import search analytics data:
-  - Clicks, impressions, CTR, average position
-  - Top performing pages
-  - Top queries
-  - Geographic performance
-- Historical data sync (last 16 months)
-- Automatic daily updates
-- Combined GSC + manual tracking views
+### 7. Google Search Console Integration (REQUIRED)
+**Priority Feature** - This provides verified, accurate data directly from Google.
+
+- **OAuth2 Authentication**:
+  - Secure Google account linking
+  - Multi-property support (if user has multiple verified sites)
+  - Token refresh handling
+- **Data Import & Sync**:
+  - Import search analytics data automatically:
+    - Clicks, impressions, CTR, average position
+    - Top performing pages
+    - Top queries (actual search terms people use)
+    - Geographic performance (country/region breakdown)
+    - Device breakdown (desktop, mobile, tablet)
+  - Historical data sync (last 16 months of data)
+  - Automatic daily updates via cron job
+  - Manual refresh option
+- **Unified Data Views**:
+  - Combined GSC + DataForSEO ranking data
+  - Cross-reference GSC queries with tracked keywords
+  - Identify new keyword opportunities from GSC queries
+  - Compare GSC positions vs DataForSEO SERP positions
+  - CTR analysis by position
+- **Performance Insights**:
+  - Pages losing traffic
+  - Queries with high impressions but low clicks (CTR optimization opportunities)
+  - Position changes over time
+  - Seasonal trends
+- **Data Storage**:
+  - Store all GSC data in Supabase `gsc_data` table
+  - Efficient querying with proper indexes
+  - Deduplication handling for daily syncs
 
 ### 8. API Usage & Credits System
 - Track DataForSEO API usage per user
@@ -126,12 +165,43 @@ Build a comprehensive SEO management dashboard that allows users to track keywor
   - Scheduled email reports (weekly/monthly)
   - White-label report options
 
-### 10. AI Assistant (Optional/Future)
-- Chat interface for SEO insights
-- Natural language queries ("What keywords am I ranking for in position 2-5?")
-- Content optimization suggestions
-- Keyword clustering and grouping recommendations
-- Uses OpenAI API with project context
+### 10. AI SEO Assistant (REQUIRED)
+**Priority Feature** - Chat widget for intelligent SEO insights and data analysis.
+
+- **Chat Widget Interface**:
+  - Persistent chat widget (bottom-right corner, expandable/collapsible)
+  - Available on all dashboard pages
+  - Chat history persistence per user
+  - Markdown support for formatted responses
+  - Code block rendering for SQL queries or examples
+- **Natural Language Queries**:
+  - "What keywords am I ranking for in position 2-5?"
+  - "Show me keywords that dropped in the last 7 days"
+  - "Which competitors are outranking me?"
+  - "What pages have the best CTR?"
+  - "Summarize my backlink profile"
+- **Data-Aware Responses**:
+  - AI has context of user's projects, keywords, rankings, and GSC data
+  - Can query the database via function calling
+  - Returns actual data from user's account (not generic advice)
+  - Generates charts and visualizations when relevant
+- **SEO Recommendations**:
+  - Content optimization suggestions based on ranking data
+  - Keyword clustering and grouping recommendations
+  - Identify low-hanging fruit (keywords in positions 4-20)
+  - Technical SEO issue detection from GSC data
+  - Competitor content gap analysis
+- **Implementation**:
+  - Uses OpenAI GPT-4 with function calling
+  - Server-side API route handles chat completions
+  - Functions available to AI:
+    - `getProjectKeywords(projectId)`
+    - `getRankingHistory(keywordId, days)`
+    - `getGSCData(projectId, dateRange)`
+    - `getBacklinks(projectId)`
+    - `getCompetitorData(projectId)`
+  - Streaming responses for better UX
+  - Rate limiting to prevent abuse
 
 ## Database Schema
 
@@ -246,6 +316,69 @@ Build a comprehensive SEO management dashboard that allows users to track keywor
 - created_at (timestamp)
 ```
 
+#### `outreach_campaigns`
+```sql
+- id (uuid, primary key)
+- project_id (uuid, references projects.id)
+- name (text) -- campaign name
+- status (text) -- "active", "paused", "completed"
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
+#### `outreach_prospects`
+```sql
+- id (uuid, primary key)
+- campaign_id (uuid, references outreach_campaigns.id)
+- domain (text)
+- contact_name (text, nullable)
+- contact_email (text)
+- contact_position (text, nullable)
+- domain_authority (integer, nullable)
+- status (text) -- "pending", "contacted", "responded", "success", "rejected"
+- email_sent_at (timestamp, nullable)
+- response_received_at (timestamp, nullable)
+- notes (text, nullable)
+- custom_fields (jsonb, nullable) -- for email template personalization
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
+#### `outreach_templates`
+```sql
+- id (uuid, primary key)
+- user_id (uuid, references profiles.id)
+- name (text)
+- subject (text)
+- body (text) -- supports template variables like {{contact_name}}, {{domain}}, etc.
+- is_default (boolean, default false)
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
+#### `chat_messages`
+```sql
+- id (uuid, primary key)
+- user_id (uuid, references profiles.id)
+- role (text) -- "user" or "assistant"
+- content (text)
+- function_calls (jsonb, nullable) -- stores function calling data if AI used functions
+- created_at (timestamp)
+```
+
+#### `gsc_tokens`
+```sql
+- id (uuid, primary key)
+- user_id (uuid, references profiles.id)
+- project_id (uuid, references projects.id, nullable)
+- access_token (text)
+- refresh_token (text)
+- token_expiry (timestamp)
+- site_url (text) -- verified property in GSC
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
 ### Row Level Security (RLS) Policies
 
 All tables must have RLS enabled with policies ensuring:
@@ -274,7 +407,7 @@ connor-seo-tool/
 │   │   └── register/
 │   │       └── page.tsx
 │   ├── (dashboard)/
-│   │   ├── layout.tsx          # Protected layout with nav
+│   │   ├── layout.tsx          # Protected layout with nav + AI chat widget
 │   │   ├── page.tsx             # Main dashboard
 │   │   ├── projects/
 │   │   │   ├── page.tsx         # Projects list
@@ -283,13 +416,27 @@ connor-seo-tool/
 │   │   │   │   ├── keywords/
 │   │   │   │   ├── rankings/
 │   │   │   │   ├── competitors/
-│   │   │   │   └── backlinks/
+│   │   │   │   ├── backlinks/
+│   │   │   │   ├── gsc/
+│   │   │   │   │   └── page.tsx # GSC data view
+│   │   │   │   └── outreach/
+│   │   │   │       ├── page.tsx # Campaigns list
+│   │   │   │       └── [campaignId]/
+│   │   │   │           └── page.tsx # Campaign details
 │   │   │   └── new/
 │   │   │       └── page.tsx
 │   │   ├── keyword-research/
 │   │   │   └── page.tsx
+│   │   ├── outreach/
+│   │   │   ├── page.tsx         # All campaigns
+│   │   │   ├── templates/
+│   │   │   │   └── page.tsx     # Email templates
+│   │   │   └── new/
+│   │   │       └── page.tsx     # Create campaign
 │   │   └── settings/
-│   │       └── page.tsx
+│   │       ├── page.tsx
+│   │       └── integrations/
+│   │           └── page.tsx     # GSC OAuth, webhook setup
 │   ├── api/
 │   │   ├── dataforseo/
 │   │   │   ├── keywords/route.ts
@@ -297,9 +444,17 @@ connor-seo-tool/
 │   │   │   └── backlinks/route.ts
 │   │   ├── gsc/
 │   │   │   ├── auth/route.ts
+│   │   │   ├── callback/route.ts # OAuth callback
+│   │   │   ├── sync/route.ts     # Manual sync trigger
 │   │   │   └── data/route.ts
+│   │   ├── chat/
+│   │   │   └── route.ts          # AI chat completions
+│   │   ├── outreach/
+│   │   │   ├── send-email/route.ts # Webhook for email sending
+│   │   │   └── webhook/route.ts    # Receive email responses
 │   │   └── cron/
-│   │       └── daily-rank-check/route.ts
+│   │       ├── daily-rank-check/route.ts
+│   │       └── gsc-sync/route.ts
 │   ├── layout.tsx
 │   └── page.tsx                 # Landing/welcome page
 ├── components/
@@ -308,6 +463,14 @@ connor-seo-tool/
 │   ├── projects/
 │   ├── keywords/
 │   ├── charts/
+│   ├── chat/
+│   │   ├── ChatWidget.tsx       # Expandable chat widget
+│   │   ├── ChatMessage.tsx
+│   │   └── ChatInput.tsx
+│   ├── outreach/
+│   │   ├── CampaignList.tsx
+│   │   ├── ProspectTable.tsx
+│   │   └── EmailTemplateEditor.tsx
 │   └── layout/
 ├── lib/
 │   ├── supabase/
@@ -317,12 +480,20 @@ connor-seo-tool/
 │   ├── dataforseo/
 │   │   └── client.ts
 │   ├── gsc/
-│   │   └── client.ts
+│   │   ├── client.ts
+│   │   └── oauth.ts             # OAuth flow helpers
+│   ├── openai/
+│   │   ├── client.ts
+│   │   └── functions.ts         # Function definitions for AI
+│   ├── email/
+│   │   └── webhook.ts           # Email webhook handler
 │   └── utils.ts
 ├── hooks/
 │   ├── useAuth.ts
 │   ├── useProject.ts
-│   └── useKeywords.ts
+│   ├── useKeywords.ts
+│   ├── useChat.ts
+│   └── useGSC.ts
 ├── types/
 │   └── index.ts
 └── middleware.ts                # Next.js middleware for auth
@@ -464,14 +635,266 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### 2. Daily Rank Checking (Cron Job)
+### 2. Google Search Console Integration Implementation
 
-Use **Vercel Cron Jobs** or **Supabase Edge Functions** to:
+**OAuth2 Flow**:
+```typescript
+// app/api/gsc/auth/route.ts
+import { google } from 'googleapis'
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  )
+
+  const url = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/webmasters.readonly'],
+    prompt: 'consent'
+  })
+
+  return NextResponse.redirect(url)
+}
+```
+
+**Data Sync**:
+```typescript
+// app/api/gsc/sync/route.ts
+import { google } from 'googleapis'
+import { createClient } from '@/lib/supabase/server'
+
+export async function POST(request: NextRequest) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Get user's OAuth tokens from database
+  const { data: tokens } = await supabase
+    .from('gsc_tokens')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
+
+  const oauth2Client = new google.auth.OAuth2(/*...*/)
+  oauth2Client.setCredentials(tokens)
+
+  const searchconsole = google.searchconsole({ version: 'v1', auth: oauth2Client })
+
+  // Fetch last 30 days of data
+  const endDate = new Date()
+  const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+  const response = await searchconsole.searchanalytics.query({
+    siteUrl: project.domain,
+    requestBody: {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      dimensions: ['query', 'page', 'date', 'device', 'country'],
+      rowLimit: 25000
+    }
+  })
+
+  // Insert into gsc_data table
+  for (const row of response.data.rows) {
+    await supabase.from('gsc_data').upsert({
+      project_id: project.id,
+      date: row.keys[2],
+      query: row.keys[0],
+      page: row.keys[1],
+      device: row.keys[3],
+      country: row.keys[4],
+      clicks: row.clicks,
+      impressions: row.impressions,
+      ctr: row.ctr,
+      position: row.position
+    })
+  }
+}
+```
+
+### 3. AI Chat Widget Implementation
+
+**Chat API with Function Calling**:
+```typescript
+// app/api/chat/route.ts
+import { OpenAI } from 'openai'
+import { createClient } from '@/lib/supabase/server'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const functions = [
+  {
+    name: 'getProjectKeywords',
+    description: 'Get all keywords for a project',
+    parameters: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string' }
+      }
+    }
+  },
+  {
+    name: 'getRankingHistory',
+    description: 'Get ranking history for a keyword',
+    parameters: {
+      type: 'object',
+      properties: {
+        keywordId: { type: 'string' },
+        days: { type: 'number' }
+      }
+    }
+  },
+  // ... more functions
+]
+
+export async function POST(request: NextRequest) {
+  const { messages } = await request.json()
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages,
+    functions,
+    function_call: 'auto',
+    stream: true
+  })
+
+  // Handle streaming response and function calls
+  // Store messages in chat_messages table
+
+  return new Response(stream)
+}
+```
+
+**Chat Widget Component**:
+```typescript
+// components/chat/ChatWidget.tsx
+'use client'
+
+export function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="rounded-full bg-primary-600 p-4 shadow-lg"
+        >
+          <MessageCircle className="h-6 w-6 text-white" />
+        </button>
+      )}
+
+      {isOpen && (
+        <div className="w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="font-semibold">SEO Assistant</h3>
+            <button onClick={() => setIsOpen(false)}>×</button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {messages.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} />
+            ))}
+          </div>
+
+          <ChatInput onSend={handleSend} />
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+### 4. Backlink Outreach Implementation
+
+**Email Webhook Integration**:
+```typescript
+// app/api/outreach/send-email/route.ts
+export async function POST(request: NextRequest) {
+  const { prospectId, templateId } = await request.json()
+  const supabase = createClient()
+
+  // Get prospect and template data
+  const { data: prospect } = await supabase
+    .from('outreach_prospects')
+    .select('*')
+    .eq('id', prospectId)
+    .single()
+
+  const { data: template } = await supabase
+    .from('outreach_templates')
+    .select('*')
+    .eq('id', templateId)
+    .single()
+
+  // Replace template variables
+  const personalizedSubject = template.subject
+    .replace('{{contact_name}}', prospect.contact_name)
+    .replace('{{domain}}', prospect.domain)
+
+  const personalizedBody = template.body
+    .replace('{{contact_name}}', prospect.contact_name)
+    .replace('{{domain}}', prospect.domain)
+    // ... more replacements
+
+  // Send via webhook (user can configure Resend, SendGrid, etc.)
+  const webhookUrl = process.env.EMAIL_WEBHOOK_URL
+
+  await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: prospect.contact_email,
+      subject: personalizedSubject,
+      html: personalizedBody,
+      metadata: {
+        prospect_id: prospectId,
+        campaign_id: prospect.campaign_id
+      }
+    })
+  })
+
+  // Update prospect status
+  await supabase
+    .from('outreach_prospects')
+    .update({
+      status: 'contacted',
+      email_sent_at: new Date().toISOString()
+    })
+    .eq('id', prospectId)
+}
+```
+
+### 5. Daily Rank Checking (Cron Job)
+
+Use **Vercel Cron Jobs** to:
 - Run daily at a scheduled time
 - Query all active keywords across all projects
 - Call DataForSEO SERP API to get current rankings
 - Insert new ranking records into `rankings` table
 - Detect significant changes and create alerts
+
+**vercel.json**:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily-rank-check",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/gsc-sync",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+```
 
 ### 3. Data Visualization
 
@@ -511,8 +934,14 @@ GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
 GOOGLE_REDIRECT_URI=your_redirect_uri
 
-# Optional: OpenAI for AI features
+# OpenAI for AI Chat Assistant (REQUIRED)
 OPENAI_API_KEY=your_openai_key
+
+# Email Webhook for Outreach (user configurable)
+EMAIL_WEBHOOK_URL=https://api.resend.com/emails
+# Or: https://api.sendgrid.com/v3/mail/send
+# Or: https://api.mailgun.net/v3/your-domain/messages
+# Or: custom webhook endpoint
 
 # App URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -558,12 +987,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 4. **Core Features (in order)**:
    - Project management CRUD
-   - Keyword research integration
+   - Keyword research integration (DataForSEO)
    - Keyword tracking and ranking display
    - Ranking history and charts
+   - **Google Search Console integration (PRIORITY)**
+   - **AI Chat Widget (PRIORITY)**
    - Competitor analysis
    - Backlink monitoring
-   - Google Search Console integration
+   - Backlink outreach builder with email webhook
    - API usage tracking
    - Reporting features
 
@@ -579,13 +1010,20 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 The project is complete when:
 - ✅ Users can register and log in securely
 - ✅ Users can create and manage multiple website projects
-- ✅ Keyword research returns accurate data from DataForSEO
+- ✅ Keyword research returns accurate data from DataForSEO (volume, difficulty, CPC)
 - ✅ Keywords can be tracked and historical rankings are stored
 - ✅ Ranking charts display properly with trend data
+- ✅ **Google Search Console OAuth works and data syncs automatically**
+- ✅ **GSC data displays in unified views with DataForSEO rankings**
+- ✅ **AI chat widget is functional and can query user's SEO data**
+- ✅ **Chat assistant provides intelligent insights based on actual project data**
 - ✅ Competitor domains can be added and compared
 - ✅ Backlink data is fetched and displayed
-- ✅ Google Search Console integration works end-to-end
-- ✅ Daily automated rank checking runs successfully
+- ✅ **Outreach campaigns can be created with prospect management**
+- ✅ **Email templates work with variable substitution**
+- ✅ **Webhook email sending integration is functional**
+- ✅ Daily automated rank checking runs successfully via cron
+- ✅ Daily GSC sync runs successfully via cron
 - ✅ API usage is tracked and displayed to users
 - ✅ All features work on both desktop and mobile browsers
 - ✅ Application is deployed to Vercel and accessible
