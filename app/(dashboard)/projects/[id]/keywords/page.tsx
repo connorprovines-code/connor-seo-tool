@@ -52,7 +52,7 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
       </div>
 
       {keywords && keywords.length > 0 ? (
-        <KeywordList keywords={keywords} projectId={project.id} />
+        <KeywordList keywords={keywords} projectId={project.id} projectDomain={project.domain} />
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
