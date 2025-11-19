@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Keyword } from '@/types'
-import { Trash2, Lightbulb } from 'lucide-react'
+import { Trash2, Lightbulb, TrendingUp, ChevronDown, ChevronUp, ExternalLink, Trophy, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
-import CheckRankButton from '@/components/keywords/CheckRankButton'
 import SimilarKeywordsModal from '@/components/keywords/SimilarKeywordsModal'
 
 interface KeywordListProps {
@@ -17,12 +16,153 @@ interface KeywordListProps {
   projectDomain: string
 }
 
+interface RankCheckResult {
+  id: string
+  keyword_id: string
+  position: number | null
+  rank_url: string | null
+  rank_title: string | null
+  top_results: Array<{
+    position: number
+    url: string
+    domain: string
+    title: string
+    description: string
+  }>
+  checked_at: string
+}
+
 export default function KeywordList({ keywords, projectId, projectDomain }: KeywordListProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null)
   const [showSimilarModal, setShowSimilarModal] = useState(false)
+  const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null)
+  const [rankResults, setRankResults] = useState<Record<string, RankCheckResult>>({})
+  const [loadingRank, setLoadingRank] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  // Load existing rank results for all keywords on mount
+  useEffect(() => {
+    loadRankResults()
+  }, [keywords])
+
+  const loadRankResults = async () => {
+    const keywordIds = keywords.map(k => k.id)
+    if (keywordIds.length === 0) return
+
+    const { data, error } = await supabase
+      .from('rank_check_results')
+      .select('*')
+      .in('keyword_id', keywordIds)
+      .order('checked_at', { ascending: false })
+
+    if (!error && data) {
+      // Get most recent result for each keyword
+      const results: Record<string, RankCheckResult> = {}
+      for (const item of data) {
+        if (!results[item.keyword_id]) {
+          results[item.keyword_id] = item
+        }
+      }
+      setRankResults(results)
+    }
+  }
+
+  const handleCheckRank = async (keywordId: string, keyword: string) => {
+    setLoadingRank(keywordId)
+
+    try {
+      // Call API to check ranking
+      const response = await fetch('/api/dataforseo/rankings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword,
+          domain: projectDomain,
+          locationCode: 2840,
+          device: 'desktop',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to check ranking')
+      }
+
+      const data = await response.json()
+
+      // Save to rank_check_results table
+      const { data: savedResult, error } = await supabase
+        .from('rank_check_results')
+        .insert({
+          keyword_id: keywordId,
+          project_id: projectId,
+          keyword,
+          domain: projectDomain,
+          position: data.position || null,
+          rank_url: data.rankUrl,
+          rank_title: data.rankTitle,
+          total_results: data.totalResults || 0,
+          serp_features: data.serpFeatures || 0,
+          top_results: data.topResults || [],
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Failed to save rank result:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to save ranking data',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // Update local state
+      setRankResults(prev => ({
+        ...prev,
+        [keywordId]: savedResult
+      }))
+
+      // Expand to show results
+      setExpandedKeyword(keywordId)
+
+      // Also save to rankings table for historical tracking
+      await supabase.from('rankings').insert({
+        keyword_id: keywordId,
+        project_id: projectId,
+        rank_position: data.position || 100,
+        rank_url: data.rankUrl,
+        rank_absolute: data.position || 100,
+        search_engine: 'google',
+        device: 'desktop',
+        location_code: 2840,
+        language_code: 'en',
+      })
+
+      toast({
+        title: 'Success',
+        description: data.position
+          ? `Your site ranks at position #${data.position}`
+          : 'Your site is not in top 100',
+      })
+
+      router.refresh()
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to check ranking',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingRank(null)
+    }
+  }
+
+  const toggleExpand = (keywordId: string) => {
+    setExpandedKeyword(expandedKeyword === keywordId ? null : keywordId)
+  }
 
   const handleShowSimilar = (keyword: string) => {
     setSelectedKeyword(keyword)
@@ -65,64 +205,185 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
   }
 
   return (
-    <div className="space-y-4">
-      {keywords.map((kw) => (
-        <Card key={kw.id}>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">{kw.keyword}</h3>
-              <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                {kw.search_volume && (
-                  <span>Volume: {kw.search_volume.toLocaleString()}</span>
-                )}
-                {kw.competition && (
-                  <span className="capitalize">Competition: {kw.competition}</span>
-                )}
-                {kw.cpc && <span>CPC: ${kw.cpc.toFixed(2)}</span>}
-                {kw.keyword_difficulty && (
-                  <span>Difficulty: {kw.keyword_difficulty}/100</span>
-                )}
-              </div>
-              {kw.tags && kw.tags.length > 0 && (
-                <div className="flex gap-2 mt-2">
-                  {kw.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+    <div className="space-y-2">
+      {keywords.map((kw) => {
+        const rankResult = rankResults[kw.id]
+        const isExpanded = expandedKeyword === kw.id
+        const hasRankData = !!rankResult
+
+        return (
+          <Card key={kw.id} className="overflow-hidden">
+            {/* Main Keyword Row */}
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm truncate">{kw.keyword}</h3>
+                  <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                    {kw.search_volume && (
+                      <span>{kw.search_volume.toLocaleString()} vol</span>
+                    )}
+                    {kw.competition && (
+                      <span className="capitalize">{kw.competition}</span>
+                    )}
+                    {kw.cpc && <span>${kw.cpc.toFixed(2)}</span>}
+                    {rankResult && (
+                      <span className="font-medium text-primary">
+                        {rankResult.position ? `#${rankResult.position}` : 'Not ranked'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleShowSimilar(kw.keyword)}
-              >
-                <Lightbulb className="h-4 w-4 mr-1" />
-                Similar
-              </Button>
-              <CheckRankButton
-                keywordId={kw.id}
-                keyword={kw.keyword}
-                projectId={projectId}
-                domain={projectDomain}
-              />
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleDelete(kw.id, kw.keyword)}
-                disabled={deleting === kw.id}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                <div className="flex gap-1 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleShowSimilar(kw.keyword)}
+                    className="h-7 px-2"
+                  >
+                    <Lightbulb className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCheckRank(kw.id, kw.keyword)}
+                    disabled={loadingRank === kw.id}
+                    className="h-7 px-2"
+                  >
+                    {loadingRank === kw.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  {hasRankData && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleExpand(kw.id)}
+                      className="h-7 px-2"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(kw.id, kw.keyword)}
+                    disabled={deleting === kw.id}
+                    className="h-7 px-2"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+
+            {/* Expandable Rank Results */}
+            {hasRankData && isExpanded && (
+              <div className="border-t bg-gray-50 p-3">
+                {/* Your Position */}
+                <div className={`rounded-lg border-2 p-3 mb-3 ${
+                  rankResult.position
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-300 bg-gray-100'
+                }`}>
+                  {rankResult.position ? (
+                    <div className="flex items-start gap-2">
+                      <div className="p-2 bg-primary text-white rounded-full flex-shrink-0">
+                        <Trophy className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm mb-1">Position #{rankResult.position}</h4>
+                        <p className="text-xs font-medium mb-1 truncate">{rankResult.rank_title}</p>
+                        {rankResult.rank_url && (
+                          <a
+                            href={rankResult.rank_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1 truncate"
+                          >
+                            {rankResult.rank_url}
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <div className="p-2 bg-gray-400 text-white rounded-full flex-shrink-0">
+                        <AlertCircle className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-xs mb-0.5">Not in Top 100</h4>
+                        <p className="text-xs text-gray-600">
+                          Your domain isn't ranking in the top 100.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Top 10 Results */}
+                {rankResult.top_results && rankResult.top_results.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-xs mb-2">Top 10:</h4>
+                    <div className="space-y-1.5">
+                      {rankResult.top_results.map((result) => {
+                        const isYourDomain = result.domain.includes(
+                          projectDomain.replace(/^https?:\/\//, '').replace(/\/$/, '')
+                        )
+
+                        return (
+                          <div
+                            key={result.position}
+                            className={`flex items-start gap-2 p-2 rounded border text-xs ${
+                              isYourDomain
+                                ? 'border-primary bg-primary/5'
+                                : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isYourDomain ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {result.position}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1 mb-0.5">
+                                <span className="font-medium text-primary truncate">
+                                  {result.domain}
+                                </span>
+                                {isYourDomain && (
+                                  <span className="text-xs bg-primary text-white px-1 py-0.5 rounded">
+                                    YOU
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className="font-semibold text-gray-900 truncate">
+                                {result.title}
+                              </h5>
+                              <p className="text-gray-600 line-clamp-1">
+                                {result.description}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-2 text-xs text-gray-500 text-right">
+                  {new Date(rankResult.checked_at).toLocaleString()}
+                </div>
+              </div>
+            )}
+          </Card>
+        )
+      })}
 
       {/* Similar Keywords Modal */}
       {selectedKeyword && (
