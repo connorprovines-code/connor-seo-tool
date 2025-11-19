@@ -23,11 +23,26 @@ export class DataForSEOClient {
       body: JSON.stringify(data),
     })
 
+    const result = await response.json()
+
     if (!response.ok) {
-      throw new Error(`DataForSEO API error: ${response.statusText}`)
+      console.error('DataForSEO API Error:', {
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+        response: result,
+      })
+      throw new Error(`DataForSEO API error: ${response.statusText} - ${JSON.stringify(result)}`)
     }
 
-    return response.json()
+    // Check for DataForSEO status_code in response
+    if (result.status_code && result.status_code >= 40000) {
+      console.error('DataForSEO Error Response:', result)
+      throw new Error(`DataForSEO Error: ${result.status_message || 'Unknown error'}`)
+    }
+
+    return result
   }
 
   // Keyword research - Get search volume and metrics
@@ -55,12 +70,13 @@ export class DataForSEOClient {
 
   // Get similar keywords using DataForSEO Labs (better, faster, cheaper)
   async getSimilarKeywords(keyword: string, locationCode: number = 2840, limit: number = 100) {
+    console.log(`Calling keyword_ideas for: "${keyword}", location: ${locationCode}, limit: ${limit}`)
     return this.makeRequest('/dataforseo_labs/google/keyword_ideas/live', [
       {
-        keyword,
+        keyword: keyword, // Some endpoints use singular, keeping both for debugging
         location_code: locationCode,
         language_code: 'en',
-        limit,
+        limit: limit,
         include_serp_info: false,
       },
     ])
