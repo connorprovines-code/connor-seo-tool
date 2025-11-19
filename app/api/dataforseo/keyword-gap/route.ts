@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       projectId,
       competitorDomain,
       locationCode = 2840,
-      limit = 100,
+      limit = 20, // Reduced from 100 - focus on top opportunities
     } = await request.json()
 
     if (!projectId || !competitorDomain) {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Get competitor keywords from DataForSEO
     const result = await dataForSEO.getKeywordsForSite(cleanDomain, locationCode, {
-      limit: Math.min(limit, 500),
+      limit: Math.min(limit, 100), // Cap at 100 to control API costs
       offset: 0,
       includeSerp: false,
       orderBy: ['keyword_data.keyword_info.search_volume,desc'], // Highest volume first

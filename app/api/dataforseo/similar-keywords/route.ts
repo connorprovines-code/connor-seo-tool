@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       keyword,
       locationCode = 2840,
       includeSERP = true,
-      limit = 20
+      limit = 10 // Reduced from 20 to save API costs
     } = await request.json()
 
     if (!keyword) {
@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get similar keywords using DataForSEO Labs (better than Google Ads endpoint)
-    const ideasResult = await dataForSEO.getSimilarKeywords(keyword, locationCode, Math.min(limit, 1000))
+    // Cap at 50 to prevent excessive API costs
+    const ideasResult = await dataForSEO.getSimilarKeywords(keyword, locationCode, Math.min(limit, 50))
 
     console.log('DataForSEO Labs keyword ideas response:', JSON.stringify(ideasResult, null, 2))
 

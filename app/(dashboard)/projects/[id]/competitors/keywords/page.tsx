@@ -64,7 +64,7 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           domain: domain.trim(),
-          limit: 100,
+          limit: 20, // Reduced to save API costs - top 20 by volume
         }),
       })
 
@@ -112,7 +112,7 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
         body: JSON.stringify({
           projectId,
           competitorDomain: analyzedDomain,
-          limit: 200,
+          limit: 20, // Top 20 gap opportunities by volume
         }),
       })
 
