@@ -7,9 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Keyword } from '@/types'
-import { Trash2, Lightbulb, TrendingUp, ChevronDown, ChevronUp, ExternalLink, Trophy, AlertCircle, Loader2 } from 'lucide-react'
+import { Trash2, Lightbulb, TrendingUp, ChevronDown, ChevronUp, ExternalLink, Trophy, AlertCircle, Loader2, Search, DollarSign } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
-import SimilarKeywordsModal from '@/components/keywords/SimilarKeywordsModal'
 import { KeywordSparkline } from '@/components/keywords/KeywordSparkline'
 
 interface KeywordListProps {
@@ -32,6 +31,14 @@ interface RankCheckResult {
     description: string
   }>
   checked_at: string
+}
+
+interface SimilarKeyword {
+  keyword: string
+  search_volume: number
+  competition: string
+  cpc: number
+  keyword_difficulty?: number
 }
 
 // Utility function for difficulty badge
@@ -57,11 +64,12 @@ const getDifficultyBadge = (difficulty: number | null) => {
 
 export default function KeywordList({ keywords, projectId, projectDomain }: KeywordListProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null)
-  const [showSimilarModal, setShowSimilarModal] = useState(false)
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null)
+  const [expandedType, setExpandedType] = useState<'rank' | 'similar' | null>(null)
   const [rankResults, setRankResults] = useState<Record<string, RankCheckResult>>({})
+  const [similarResults, setSimilarResults] = useState<Record<string, SimilarKeyword[]>>({})
   const [loadingRank, setLoadingRank] = useState<string | null>(null)
+  const [loadingSimilar, setLoadingSimilar] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -80,7 +88,13 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
       .in('keyword_id', keywordIds)
       .order('checked_at', { ascending: false })
 
-    if (!error && data) {
+    if (error) {
+      // Table might not exist yet (migrations not applied)
+      console.warn('rank_check_results table not found - migrations may need to be applied')
+      return
+    }
+
+    if (data) {
       // Get most recent result for each keyword
       const results: Record<string, RankCheckResult> = {}
       for (const item of data) {
@@ -114,8 +128,8 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
 
       const data = await response.json()
 
-      // Save to rank_check_results table
-      const { data: savedResult, error } = await supabase
+      // Try to save to rank_check_results table (if it exists)
+      const { data: savedResult, error: saveError } = await supabase
         .from('rank_check_results')
         .insert({
           keyword_id: keywordId,
@@ -132,24 +146,36 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
         .select()
         .single()
 
-      if (error) {
-        console.error('Failed to save rank result:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to save ranking data',
-          variant: 'destructive',
-        })
-        return
+      if (saveError) {
+        console.warn('Could not save to rank_check_results - table may not exist:', saveError)
+        // Continue anyway - show results without persistence
+      } else if (savedResult) {
+        // Update local state
+        setRankResults(prev => ({
+          ...prev,
+          [keywordId]: savedResult
+        }))
       }
 
-      // Update local state
+      // Store results in memory for current session
+      const tempResult: RankCheckResult = {
+        id: 'temp-' + keywordId,
+        keyword_id: keywordId,
+        position: data.position || null,
+        rank_url: data.rankUrl,
+        rank_title: data.rankTitle,
+        top_results: data.topResults || [],
+        checked_at: new Date().toISOString(),
+      }
+
       setRankResults(prev => ({
         ...prev,
-        [keywordId]: savedResult
+        [keywordId]: savedResult || tempResult
       }))
 
       // Expand to show results
       setExpandedKeyword(keywordId)
+      setExpandedType('rank')
 
       // Also save to rankings table for historical tracking
       await supabase.from('rankings').insert({
@@ -183,13 +209,81 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
     }
   }
 
-  const toggleExpand = (keywordId: string) => {
-    setExpandedKeyword(expandedKeyword === keywordId ? null : keywordId)
+  const handleFetchSimilar = async (keywordId: string, keyword: string) => {
+    // If already expanded and showing similar, just toggle closed
+    if (expandedKeyword === keywordId && expandedType === 'similar') {
+      setExpandedKeyword(null)
+      setExpandedType(null)
+      return
+    }
+
+    // If we already have similar keywords cached, just show them
+    if (similarResults[keywordId]) {
+      setExpandedKeyword(keywordId)
+      setExpandedType('similar')
+      return
+    }
+
+    setLoadingSimilar(keywordId)
+
+    try {
+      const response = await fetch('/api/dataforseo/similar-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword,
+          limit: 20,
+          includeSERP: false,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch similar keywords')
+      }
+
+      const data = await response.json()
+      const ideas = data.ideas || []
+
+      // Map to our interface
+      const similarKeywords: SimilarKeyword[] = ideas.map((idea: any) => ({
+        keyword: idea.keyword,
+        search_volume: idea.search_volume || 0,
+        competition: idea.competition_level || 'N/A',
+        cpc: idea.cpc || 0,
+        keyword_difficulty: idea.keyword_difficulty,
+      }))
+
+      setSimilarResults(prev => ({
+        ...prev,
+        [keywordId]: similarKeywords,
+      }))
+
+      setExpandedKeyword(keywordId)
+      setExpandedType('similar')
+
+      toast({
+        title: 'Success',
+        description: `Found ${similarKeywords.length} similar keywords`,
+      })
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch similar keywords',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingSimilar(null)
+    }
   }
 
-  const handleShowSimilar = (keyword: string) => {
-    setSelectedKeyword(keyword)
-    setShowSimilarModal(true)
+  const toggleExpand = (keywordId: string, type: 'rank' | 'similar') => {
+    if (expandedKeyword === keywordId && expandedType === type) {
+      setExpandedKeyword(null)
+      setExpandedType(null)
+    } else {
+      setExpandedKeyword(keywordId)
+      setExpandedType(type)
+    }
   }
 
   const handleDelete = async (keywordId: string, keyword: string) => {
@@ -231,8 +325,12 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
     <div className="space-y-2">
       {keywords.map((kw) => {
         const rankResult = rankResults[kw.id]
+        const similarKeywords = similarResults[kw.id]
         const isExpanded = expandedKeyword === kw.id
+        const isRankExpanded = isExpanded && expandedType === 'rank'
+        const isSimilarExpanded = isExpanded && expandedType === 'similar'
         const hasRankData = !!rankResult
+        const hasSimilarData = !!similarKeywords
 
         return (
           <Card key={kw.id} className="overflow-hidden">
@@ -273,17 +371,22 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleShowSimilar(kw.keyword)}
-                    className="h-7 px-2"
+                    onClick={() => handleFetchSimilar(kw.id, kw.keyword)}
+                    disabled={loadingSimilar === kw.id}
+                    className={`h-7 px-2 ${isSimilarExpanded ? 'bg-primary/10' : ''}`}
                   >
-                    <Lightbulb className="h-3.5 w-3.5" />
+                    {loadingSimilar === kw.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Lightbulb className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleCheckRank(kw.id, kw.keyword)}
                     disabled={loadingRank === kw.id}
-                    className="h-7 px-2"
+                    className={`h-7 px-2 ${isRankExpanded ? 'bg-primary/10' : ''}`}
                   >
                     {loadingRank === kw.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -291,11 +394,11 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                       <TrendingUp className="h-3.5 w-3.5" />
                     )}
                   </Button>
-                  {hasRankData && (
+                  {(hasRankData || hasSimilarData) && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleExpand(kw.id)}
+                      onClick={() => toggleExpand(kw.id, isRankExpanded ? 'rank' : 'similar')}
                       className="h-7 px-2"
                     >
                       {isExpanded ? (
@@ -319,7 +422,7 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
             </CardContent>
 
             {/* Expandable Rank Results */}
-            {hasRankData && isExpanded && (
+            {hasRankData && isRankExpanded && (
               <div className="border-t bg-gray-50 p-3">
                 {/* Your Position */}
                 <div className={`rounded-lg border-2 p-3 mb-3 ${
@@ -417,19 +520,52 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                 </div>
               </div>
             )}
+
+            {/* Expandable Similar Keywords */}
+            {hasSimilarData && isSimilarExpanded && (
+              <div className="border-t bg-gray-50 p-3">
+                <h4 className="font-semibold text-xs mb-3 flex items-center gap-1">
+                  <Lightbulb className="h-4 w-4 text-primary" />
+                  Similar Keywords ({similarKeywords.length})
+                </h4>
+                <div className="space-y-1.5">
+                  {similarKeywords.map((sk, idx) => {
+                    const diffBadge = getDifficultyBadge(sk.keyword_difficulty || null)
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded border border-gray-200 bg-white text-xs hover:border-primary transition-colors"
+                      >
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="font-medium truncate">{sk.keyword}</span>
+                          {diffBadge && (
+                            <Badge variant={diffBadge.variant} className="text-xs h-5 px-1.5 flex-shrink-0">
+                              {diffBadge.label}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 ml-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <Search className="h-3 w-3" />
+                            <span>{sk.search_volume.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <DollarSign className="h-3 w-3" />
+                            <span>${sk.cpc.toFixed(2)}</span>
+                          </div>
+                          <span className="capitalize text-gray-500 min-w-[50px] text-right">
+                            {sk.competition}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </Card>
         )
       })}
-
-      {/* Similar Keywords Modal */}
-      {selectedKeyword && (
-        <SimilarKeywordsModal
-          open={showSimilarModal}
-          onOpenChange={setShowSimilarModal}
-          keyword={selectedKeyword}
-          projectId={projectId}
-        />
-      )}
     </div>
   )
 }
