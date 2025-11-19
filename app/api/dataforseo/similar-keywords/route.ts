@@ -108,7 +108,16 @@ export async function POST(request: NextRequest) {
       keyword,
       total_ideas: ideas.length,
       returned_ideas: enhancedIdeas.length,
-      ideas: enhancedIdeas,
+      ideas: enhancedIdeas.map((idea: any) => ({
+        keyword: idea.keyword,
+        search_volume: idea.keyword_info?.search_volume || 0,
+        competition_level: idea.keyword_info?.competition_level?.toLowerCase() || 'n/a',
+        cpc: idea.keyword_info?.cpc || 0,
+        keyword_difficulty: idea.keyword_properties?.keyword_difficulty || null,
+        monthly_searches: idea.keyword_info?.monthly_searches || [],
+        serp_rankings: idea.serp_rankings || null,
+        serp_features: idea.serp_features || null,
+      })),
       timestamp: new Date().toISOString(),
     })
   } catch (error: any) {
