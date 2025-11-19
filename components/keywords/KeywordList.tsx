@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Keyword } from '@/types'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Lightbulb } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import CheckRankButton from '@/components/keywords/CheckRankButton'
+import SimilarKeywordsModal from '@/components/keywords/SimilarKeywordsModal'
 
 interface KeywordListProps {
   keywords: Keyword[]
@@ -18,8 +19,15 @@ interface KeywordListProps {
 
 export default function KeywordList({ keywords, projectId, projectDomain }: KeywordListProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null)
+  const [showSimilarModal, setShowSimilarModal] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  const handleShowSimilar = (keyword: string) => {
+    setSelectedKeyword(keyword)
+    setShowSimilarModal(true)
+  }
 
   const handleDelete = async (keywordId: string, keyword: string) => {
     const confirmed = window.confirm(`Delete "${keyword}"?`)
@@ -89,6 +97,14 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
               )}
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleShowSimilar(kw.keyword)}
+              >
+                <Lightbulb className="h-4 w-4 mr-1" />
+                Similar
+              </Button>
               <CheckRankButton
                 keywordId={kw.id}
                 keyword={kw.keyword}
@@ -107,6 +123,16 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
           </CardContent>
         </Card>
       ))}
+
+      {/* Similar Keywords Modal */}
+      {selectedKeyword && (
+        <SimilarKeywordsModal
+          open={showSimilarModal}
+          onOpenChange={setShowSimilarModal}
+          keyword={selectedKeyword}
+          projectId={projectId}
+        />
+      )}
     </div>
   )
 }

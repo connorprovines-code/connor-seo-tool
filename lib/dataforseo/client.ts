@@ -66,6 +66,115 @@ export class DataForSEOClient {
     ])
   }
 
+  // Get related keywords from "searches related to" SERP element
+  async getRelatedKeywords(keyword: string, locationCode: number = 2840, depth: number = 1) {
+    return this.makeRequest('/dataforseo_labs/google/related_keywords/live', [
+      {
+        keyword,
+        location_code: locationCode,
+        language_code: 'en',
+        depth, // 1-3, each level returns 8x more results
+      },
+    ])
+  }
+
+  // Hybrid approach: Get keywords from multiple sources and merge
+  async getKeywordsHybrid(
+    keyword: string,
+    options: {
+      includeSEO?: boolean
+      includeAds?: boolean
+      includeRelated?: boolean
+      locationCode?: number
+      limit?: number
+    } = {}
+  ) {
+    const {
+      includeSEO = true,
+      includeAds = false,
+      includeRelated = true,
+      locationCode = 2840,
+      limit = 100,
+    } = options
+
+    // Call selected endpoints in parallel
+    const promises = []
+    if (includeSEO) {
+      promises.push(
+        this.getSimilarKeywords(keyword, locationCode, limit).catch((e) => {
+          console.error('SEO keywords error:', e)
+          return null
+        })
+      )
+    }
+    if (includeAds) {
+      promises.push(
+        this.getKeywordIdeas(keyword, locationCode).catch((e) => {
+          console.error('Ads keywords error:', e)
+          return null
+        })
+      )
+    }
+    if (includeRelated) {
+      promises.push(
+        this.getRelatedKeywords(keyword, locationCode, 1).catch((e) => {
+          console.error('Related keywords error:', e)
+          return null
+        })
+      )
+    }
+
+    const results = await Promise.all(promises)
+
+    // Merge and deduplicate results
+    const keywordMap = new Map()
+    let sourceIndex = 0
+
+    results.forEach((result, idx) => {
+      if (!result || !result.tasks || !result.tasks[0]?.result) return
+
+      const items = result.tasks[0].result[0]?.items || []
+      const source =
+        idx === 0 && includeSEO
+          ? 'seo'
+          : idx === 1 && includeAds
+          ? 'ads'
+          : 'related'
+
+      items.forEach((item: any) => {
+        const kw = item.keyword?.toLowerCase()
+        if (!kw) return
+
+        if (!keywordMap.has(kw)) {
+          keywordMap.set(kw, {
+            keyword: item.keyword,
+            search_volume: item.search_volume || item.keyword_info?.search_volume || 0,
+            competition: item.competition || item.keyword_info?.competition || 'N/A',
+            cpc: item.cpc || item.keyword_info?.cpc || 0,
+            keyword_difficulty: item.keyword_difficulty,
+            source,
+            sources: [source],
+          })
+        } else {
+          // Merge data from multiple sources - prefer higher quality data
+          const existing = keywordMap.get(kw)
+          existing.sources.push(source)
+
+          // Use highest search volume
+          if (item.search_volume > existing.search_volume) {
+            existing.search_volume = item.search_volume
+          }
+          // Use highest CPC
+          if (item.cpc > existing.cpc) {
+            existing.cpc = item.cpc
+          }
+        }
+      })
+    })
+
+    return Array.from(keywordMap.values()).slice(0, limit)
+  }
+
   // Get keyword difficulty
   async getKeywordDifficulty(keywords: string[], locationCode: number = 2840) {
     return this.makeRequest('/keywords_data/google/keyword_difficulty/live', [
