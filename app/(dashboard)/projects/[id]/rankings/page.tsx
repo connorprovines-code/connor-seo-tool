@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import RankingsChart from '@/components/charts/RankingsChart'
-import CheckRankButton from '@/components/keywords/CheckRankButton'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 interface RankingsPageProps {
@@ -182,12 +181,12 @@ export default async function RankingsPage({ params }: RankingsPageProps) {
                             : '-'}
                         </td>
                         <td className="text-right py-3 px-4">
-                          <CheckRankButton
-                            keywordId={keyword.id}
-                            keyword={keyword.keyword}
-                            projectId={project.id}
-                            domain={project.domain}
-                          />
+                          <a
+                            href={`/projects/${project.id}/keywords`}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            Check in Keywords
+                          </a>
                         </td>
                       </tr>
                     )

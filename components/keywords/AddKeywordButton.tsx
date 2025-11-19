@@ -42,10 +42,40 @@ export default function AddKeywordButton({ projectId }: AddKeywordButtonProps) {
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('keywords').insert({
+      // Fetch keyword data from DataForSEO to enrich the keyword
+      const dataForSEOResponse = await fetch('/api/dataforseo/similar-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          limit: 1, // We only need the keyword itself, not similar keywords
+          includeSERP: false,
+        }),
+      })
+
+      let keywordData: any = {
         project_id: projectId,
         keyword: keyword.trim(),
-      })
+      }
+
+      // If we successfully fetched data from DataForSEO, enrich the keyword
+      if (dataForSEOResponse.ok) {
+        const data = await dataForSEOResponse.json()
+        const mainKeyword = data.ideas?.[0]
+
+        if (mainKeyword) {
+          keywordData = {
+            ...keywordData,
+            search_volume: mainKeyword.search_volume || null,
+            competition: mainKeyword.competition_level || null,
+            cpc: mainKeyword.cpc || null,
+            keyword_difficulty: mainKeyword.keyword_difficulty || null,
+            monthly_searches: mainKeyword.monthly_searches || [],
+          }
+        }
+      }
+
+      const { error } = await supabase.from('keywords').insert(keywordData)
 
       if (error) {
         toast({

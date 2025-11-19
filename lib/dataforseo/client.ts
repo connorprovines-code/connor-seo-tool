@@ -23,11 +23,26 @@ export class DataForSEOClient {
       body: JSON.stringify(data),
     })
 
+    const result = await response.json()
+
     if (!response.ok) {
-      throw new Error(`DataForSEO API error: ${response.statusText}`)
+      console.error('DataForSEO API Error:', {
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+        response: result,
+      })
+      throw new Error(`DataForSEO API error: ${response.statusText} - ${JSON.stringify(result)}`)
     }
 
-    return response.json()
+    // Check for DataForSEO status_code in response
+    if (result.status_code && result.status_code >= 40000) {
+      console.error('DataForSEO Error Response:', result)
+      throw new Error(`DataForSEO Error: ${result.status_message || 'Unknown error'}`)
+    }
+
+    return result
   }
 
   // Keyword research - Get search volume and metrics
@@ -55,12 +70,13 @@ export class DataForSEOClient {
 
   // Get similar keywords using DataForSEO Labs (better, faster, cheaper)
   async getSimilarKeywords(keyword: string, locationCode: number = 2840, limit: number = 100) {
+    console.log(`Calling keyword_ideas for: "${keyword}", location: ${locationCode}, limit: ${limit}`)
     return this.makeRequest('/dataforseo_labs/google/keyword_ideas/live', [
       {
-        keyword,
+        keywords: [keyword], // API requires array of keywords (not singular "keyword")
         location_code: locationCode,
         language_code: 'en',
-        limit,
+        limit: limit,
         include_serp_info: false,
       },
     ])
@@ -152,6 +168,7 @@ export class DataForSEOClient {
             competition: item.competition || item.keyword_info?.competition || 'N/A',
             cpc: item.cpc || item.keyword_info?.cpc || 0,
             keyword_difficulty: item.keyword_difficulty,
+            monthly_searches: item.monthly_searches || item.keyword_info?.monthly_searches || [],
             source,
             sources: [source],
           })
@@ -182,6 +199,42 @@ export class DataForSEOClient {
         keywords,
         location_code: locationCode,
         language_code: 'en',
+      },
+    ])
+  }
+
+  // Get keywords for a specific domain (competitor analysis)
+  async getKeywordsForSite(
+    target: string,
+    locationCode: number = 2840,
+    options: {
+      limit?: number
+      offset?: number
+      filters?: any[]
+      orderBy?: string[]
+      includeSerp?: boolean
+    } = {}
+  ) {
+    const {
+      limit = 100,
+      offset = 0,
+      filters,
+      orderBy = ['keyword_data.keyword_info.search_volume,desc'],
+      includeSerp = false,
+    } = options
+
+    console.log(`Calling keywords_for_site for domain: "${target}", location: ${locationCode}, limit: ${limit}`)
+
+    return this.makeRequest('/dataforseo_labs/google/keywords_for_site/live', [
+      {
+        target,
+        location_code: locationCode,
+        language_code: 'en',
+        limit,
+        offset,
+        filters,
+        order_by: orderBy,
+        include_serp_info: includeSerp,
       },
     ])
   }
