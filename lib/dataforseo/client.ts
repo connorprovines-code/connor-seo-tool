@@ -73,7 +73,7 @@ export class DataForSEOClient {
     console.log(`Calling keyword_ideas for: "${keyword}", location: ${locationCode}, limit: ${limit}`)
     return this.makeRequest('/dataforseo_labs/google/keyword_ideas/live', [
       {
-        keyword: keyword, // Some endpoints use singular, keeping both for debugging
+        keywords: [keyword], // API requires array of keywords (not singular "keyword")
         location_code: locationCode,
         language_code: 'en',
         limit: limit,
