@@ -202,6 +202,42 @@ export class DataForSEOClient {
     ])
   }
 
+  // Get keywords for a specific domain (competitor analysis)
+  async getKeywordsForSite(
+    target: string,
+    locationCode: number = 2840,
+    options: {
+      limit?: number
+      offset?: number
+      filters?: any[]
+      orderBy?: string[]
+      includeSerp?: boolean
+    } = {}
+  ) {
+    const {
+      limit = 100,
+      offset = 0,
+      filters,
+      orderBy = ['keyword_data.keyword_info.search_volume,desc'],
+      includeSerp = false,
+    } = options
+
+    console.log(`Calling keywords_for_site for domain: "${target}", location: ${locationCode}, limit: ${limit}`)
+
+    return this.makeRequest('/dataforseo_labs/google/keywords_for_site/live', [
+      {
+        target,
+        location_code: locationCode,
+        language_code: 'en',
+        limit,
+        offset,
+        filters,
+        order_by: orderBy,
+        include_serp_info: includeSerp,
+      },
+    ])
+  }
+
   // Get SERP results for rank tracking
   async getSERPResults(keyword: string, locationCode: number = 2840, device: 'desktop' | 'mobile' = 'desktop') {
     return this.makeRequest('/serp/google/organic/live/advanced', [

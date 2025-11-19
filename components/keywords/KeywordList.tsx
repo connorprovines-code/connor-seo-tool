@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Keyword } from '@/types'
 import { Trash2, Lightbulb, TrendingUp, ChevronDown, ChevronUp, ExternalLink, Trophy, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
@@ -30,6 +31,27 @@ interface RankCheckResult {
     description: string
   }>
   checked_at: string
+}
+
+// Utility function for difficulty badge
+const getDifficultyBadge = (difficulty: number | null) => {
+  if (!difficulty && difficulty !== 0) return null
+
+  let variant: "default" | "secondary" | "destructive" | "outline" = "outline"
+  let color = "text-gray-600"
+
+  if (difficulty >= 70) {
+    variant = "destructive"
+    color = "text-red-600"
+  } else if (difficulty >= 40) {
+    variant = "secondary"
+    color = "text-yellow-600"
+  } else {
+    variant = "default"
+    color = "text-green-600"
+  }
+
+  return { variant, color, label: `KD: ${difficulty}` }
 }
 
 export default function KeywordList({ keywords, projectId, projectDomain }: KeywordListProps) {
@@ -217,8 +239,18 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
             <CardContent className="p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm truncate">{kw.keyword}</h3>
-                  <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-sm truncate">{kw.keyword}</h3>
+                    {(() => {
+                      const diffBadge = getDifficultyBadge(kw.keyword_difficulty)
+                      return diffBadge ? (
+                        <Badge variant={diffBadge.variant} className="text-xs h-5 px-1.5">
+                          {diffBadge.label}
+                        </Badge>
+                      ) : null
+                    })()}
+                  </div>
+                  <div className="flex gap-3 text-xs text-gray-500">
                     {kw.search_volume && (
                       <span>{kw.search_volume.toLocaleString()} vol</span>
                     )}
