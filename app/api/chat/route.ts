@@ -96,6 +96,15 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if API key is configured
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('ANTHROPIC_API_KEY is not configured')
+      return NextResponse.json(
+        { error: 'AI Chat is not configured. Please add ANTHROPIC_API_KEY to your environment variables.' },
+        { status: 500 }
+      )
+    }
+
     const supabase = await createClient()
     const {
       data: { user },

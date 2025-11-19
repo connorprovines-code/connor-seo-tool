@@ -12,17 +12,24 @@ interface Message {
 }
 
 export function ChatWidget() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi! I'm your AI SEO assistant. I can help you analyze your projects, keywords, rankings, backlinks, and provide strategic insights. What would you like to know?",
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Initialize with welcome message after mount to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+    setMessages([
+      {
+        role: 'assistant',
+        content: "Hi! I'm your AI SEO assistant. I can help you analyze your projects, keywords, rankings, backlinks, and provide strategic insights. What would you like to know?",
+        timestamp: new Date(),
+      },
+    ])
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -94,6 +101,11 @@ export function ChatWidget() {
       e.preventDefault()
       handleSendMessage()
     }
+  }
+
+  // Don't render until mounted to prevent hydration errors
+  if (!mounted) {
+    return null
   }
 
   return (
