@@ -73,6 +73,25 @@ export default function CheckRankButton({
       const data = await response.json()
       setRankingData(data)
 
+      // Verify keyword exists before inserting ranking
+      const { data: keywordExists, error: keywordError } = await supabase
+        .from('keywords')
+        .select('id')
+        .eq('id', keywordId)
+        .single()
+
+      if (keywordError || !keywordExists) {
+        console.error('Keyword not found:', keywordId, keywordError)
+        toast({
+          title: 'Error',
+          description: 'Keyword not found in database. Please refresh the page.',
+          variant: 'destructive',
+        })
+        setShowResults(true) // Still show the SERP results
+        router.refresh() // Refresh to sync data
+        return
+      }
+
       // Save ranking to database
       const { error } = await supabase.from('rankings').insert({
         keyword_id: keywordId,
@@ -87,11 +106,13 @@ export default function CheckRankButton({
       })
 
       if (error) {
+        console.error('Failed to save ranking:', error)
         toast({
           title: 'Error',
-          description: error.message,
+          description: `Failed to save ranking: ${error.message}`,
           variant: 'destructive',
         })
+        setShowResults(true) // Still show the SERP results even if save fails
         return
       }
 
