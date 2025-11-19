@@ -27,10 +27,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get keyword ideas (related keywords)
-    const ideasResult = await dataForSEO.getKeywordIdeas(keyword, locationCode)
+    // Get similar keywords using DataForSEO Labs (better than Google Ads endpoint)
+    const ideasResult = await dataForSEO.getSimilarKeywords(keyword, locationCode, Math.min(limit, 1000))
 
-    console.log('DataForSEO keyword ideas response:', JSON.stringify(ideasResult, null, 2))
+    console.log('DataForSEO Labs keyword ideas response:', JSON.stringify(ideasResult, null, 2))
 
     if (!ideasResult.tasks || !ideasResult.tasks[0]?.result) {
       console.error('No keyword ideas found in response:', ideasResult)

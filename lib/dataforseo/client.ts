@@ -41,7 +41,7 @@ export class DataForSEOClient {
     ])
   }
 
-  // Get keyword ideas/suggestions
+  // Get keyword ideas/suggestions (Google Ads - less reliable, more expensive)
   async getKeywordIdeas(keyword: string, locationCode: number = 2840) {
     return this.makeRequest('/keywords_data/google_ads/keywords_for_keywords/live', [
       {
@@ -49,6 +49,19 @@ export class DataForSEOClient {
         location_code: locationCode,
         language_code: 'en',
         include_adult_keywords: false,
+      },
+    ])
+  }
+
+  // Get similar keywords using DataForSEO Labs (better, faster, cheaper)
+  async getSimilarKeywords(keyword: string, locationCode: number = 2840, limit: number = 100) {
+    return this.makeRequest('/dataforseo_labs/google/keyword_ideas/live', [
+      {
+        keyword,
+        location_code: locationCode,
+        language_code: 'en',
+        limit,
+        include_serp_info: false,
       },
     ])
   }
