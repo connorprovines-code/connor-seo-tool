@@ -8,12 +8,13 @@ import AddKeywordButton from '@/components/keywords/AddKeywordButton'
 import KeywordList from '@/components/keywords/KeywordList'
 
 interface KeywordsPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function KeywordsPage({ params }: KeywordsPageProps) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -26,7 +27,7 @@ export default async function KeywordsPage({ params }: KeywordsPageProps) {
   const { data: project } = await supabase
     .from('projects')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
     .single()
 

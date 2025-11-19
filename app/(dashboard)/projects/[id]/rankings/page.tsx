@@ -6,12 +6,13 @@ import CheckRankButton from '@/components/keywords/CheckRankButton'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 interface RankingsPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function RankingsPage({ params }: RankingsPageProps) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -24,7 +25,7 @@ export default async function RankingsPage({ params }: RankingsPageProps) {
   const { data: project } = await supabase
     .from('projects')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
     .single()
 

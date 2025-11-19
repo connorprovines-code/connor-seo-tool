@@ -7,12 +7,13 @@ import { TrendingUp, Link as LinkIcon, Search, Users } from 'lucide-react'
 import DeleteProjectButton from '@/components/projects/DeleteProjectButton'
 
 interface ProjectPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -25,7 +26,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const { data: project } = await supabase
     .from('projects')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
     .single()
 

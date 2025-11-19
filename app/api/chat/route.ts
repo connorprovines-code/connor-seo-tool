@@ -60,7 +60,7 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
         .select('*')
         .eq('project_id', toolInput.project_id)
 
-      const keywordIds = kwds?.map(k => k.id) || []
+      const keywordIds = kwds?.map((k: any) => k.id) || []
 
       const { data: allRankings } = await supabase
         .from('rankings')
@@ -70,7 +70,7 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
 
       // Calculate stats
       const latestRankings = new Map()
-      allRankings?.forEach(r => {
+      allRankings?.forEach((r: any) => {
         if (!latestRankings.has(r.keyword_id)) {
           latestRankings.set(r.keyword_id, r)
         }

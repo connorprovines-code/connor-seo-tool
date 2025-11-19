@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Folder, TrendingUp, Link, BarChart3 } from 'lucide-react'
+import { Folder, TrendingUp, Link as LinkIcon, BarChart3 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
@@ -50,7 +50,7 @@ export default async function DashboardPage() {
     {
       name: 'Backlinks',
       value: backlinkCount || 0,
-      icon: Link,
+      icon: LinkIcon,
       href: '/backlinks',
     },
     {

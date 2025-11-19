@@ -5,12 +5,13 @@ import { Link as LinkIcon, TrendingUp, Globe } from 'lucide-react'
 import FetchBacklinksButton from '@/components/backlinks/FetchBacklinksButton'
 
 interface BacklinksPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function BacklinksPage({ params }: BacklinksPageProps) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -23,7 +24,7 @@ export default async function BacklinksPage({ params }: BacklinksPageProps) {
   const { data: project } = await supabase
     .from('projects')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
