@@ -6,15 +6,17 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Keyword } from '@/types'
-import { Trash2, TrendingUp } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import CheckRankButton from '@/components/keywords/CheckRankButton'
 
 interface KeywordListProps {
   keywords: Keyword[]
   projectId: string
+  projectDomain: string
 }
 
-export default function KeywordList({ keywords, projectId }: KeywordListProps) {
+export default function KeywordList({ keywords, projectId, projectDomain }: KeywordListProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -87,10 +89,12 @@ export default function KeywordList({ keywords, projectId }: KeywordListProps) {
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <TrendingUp className="h-4 w-4 mr-1" />
-                Check Rank
-              </Button>
+              <CheckRankButton
+                keywordId={kw.id}
+                keyword={kw.keyword}
+                projectId={projectId}
+                domain={projectDomain}
+              />
               <Button
                 variant="destructive"
                 size="sm"

@@ -14,6 +14,7 @@ export default function NewProjectPage() {
   const [domain, setDomain] = useState('')
   const [targetLocation, setTargetLocation] = useState('United States')
   const [targetLanguage, setTargetLanguage] = useState('en')
+  const [connectGSC, setConnectGSC] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -62,8 +63,13 @@ export default function NewProjectPage() {
         description: 'Project created successfully!',
       })
 
-      router.push(`/projects/${data.id}`)
-      router.refresh()
+      // If GSC connection requested, redirect to OAuth flow
+      if (connectGSC) {
+        window.location.href = `/api/gsc/auth?projectId=${data.id}`
+      } else {
+        router.push(`/projects/${data.id}`)
+        router.refresh()
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -147,6 +153,25 @@ export default function NewProjectPage() {
               <p className="text-xs text-muted-foreground">
                 Language code (e.g., en, es, fr)
               </p>
+            </div>
+
+            <div className="flex items-start space-x-3 rounded-md border p-4">
+              <input
+                type="checkbox"
+                id="connectGSC"
+                checked={connectGSC}
+                onChange={(e) => setConnectGSC(e.target.checked)}
+                disabled={loading}
+                className="mt-1"
+              />
+              <div className="space-y-1 flex-1">
+                <Label htmlFor="connectGSC" className="font-medium cursor-pointer">
+                  Connect Google Search Console
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Connect GSC to automatically import ranking data, clicks, and impressions for this project
+                </p>
+              </div>
             </div>
 
             <div className="flex gap-4">

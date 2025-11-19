@@ -28,8 +28,6 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Projects', href: '/projects', icon: Folder },
   { name: 'Keyword Research', href: '/keyword-research', icon: Search },
-  { name: 'Rankings', href: '/rankings', icon: TrendingUp },
-  { name: 'Backlinks', href: '/backlinks', icon: LinkIcon },
   { name: 'Outreach', href: '/outreach', icon: Mail },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
