@@ -37,6 +37,11 @@ export interface Keyword {
   keyword_difficulty: number | null
   tags: string[] | null
   category: string | null
+  monthly_searches?: Array<{
+    year: number
+    month: number
+    search_volume: number
+  }>
   created_at: string
   updated_at: string
 }

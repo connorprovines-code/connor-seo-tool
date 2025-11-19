@@ -10,6 +10,7 @@ import { Keyword } from '@/types'
 import { Trash2, Lightbulb, TrendingUp, ChevronDown, ChevronUp, ExternalLink, Trophy, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import SimilarKeywordsModal from '@/components/keywords/SimilarKeywordsModal'
+import { KeywordSparkline } from '@/components/keywords/KeywordSparkline'
 
 interface KeywordListProps {
   keywords: Keyword[]
@@ -249,6 +250,9 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                         </Badge>
                       ) : null
                     })()}
+                    {kw.monthly_searches && kw.monthly_searches.length > 0 && (
+                      <KeywordSparkline data={kw.monthly_searches} />
+                    )}
                   </div>
                   <div className="flex gap-3 text-xs text-gray-500">
                     {kw.search_volume && (

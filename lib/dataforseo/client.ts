@@ -168,6 +168,7 @@ export class DataForSEOClient {
             competition: item.competition || item.keyword_info?.competition || 'N/A',
             cpc: item.cpc || item.keyword_info?.cpc || 0,
             keyword_difficulty: item.keyword_difficulty,
+            monthly_searches: item.monthly_searches || item.keyword_info?.monthly_searches || [],
             source,
             sources: [source],
           })
