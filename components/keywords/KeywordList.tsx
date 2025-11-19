@@ -373,12 +373,16 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                     size="sm"
                     onClick={() => handleFetchSimilar(kw.id, kw.keyword)}
                     disabled={loadingSimilar === kw.id}
-                    className={`h-7 px-2 ${isSimilarExpanded ? 'bg-primary/10' : ''}`}
+                    className={`h-7 px-3 ${isSimilarExpanded ? 'bg-primary/10' : ''}`}
+                    title="Find similar keywords"
                   >
                     {loadingSimilar === kw.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Lightbulb className="h-3.5 w-3.5" />
+                      <>
+                        <Lightbulb className="h-3.5 w-3.5 mr-1" />
+                        <span className="text-xs">Similar</span>
+                      </>
                     )}
                   </Button>
                   <Button
@@ -386,12 +390,16 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                     size="sm"
                     onClick={() => handleCheckRank(kw.id, kw.keyword)}
                     disabled={loadingRank === kw.id}
-                    className={`h-7 px-2 ${isRankExpanded ? 'bg-primary/10' : ''}`}
+                    className={`h-7 px-3 ${isRankExpanded ? 'bg-primary/10' : ''}`}
+                    title="Check your ranking for this keyword"
                   >
                     {loadingRank === kw.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <TrendingUp className="h-3.5 w-3.5" />
+                      <>
+                        <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                        <span className="text-xs">Rank</span>
+                      </>
                     )}
                   </Button>
                   {(hasRankData || hasSimilarData) && (
@@ -400,6 +408,7 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                       size="sm"
                       onClick={() => toggleExpand(kw.id, isRankExpanded ? 'rank' : 'similar')}
                       className="h-7 px-2"
+                      title={isExpanded ? "Collapse" : "Expand results"}
                     >
                       {isExpanded ? (
                         <ChevronUp className="h-3.5 w-3.5" />
@@ -414,6 +423,7 @@ export default function KeywordList({ keywords, projectId, projectDomain }: Keyw
                     onClick={() => handleDelete(kw.id, kw.keyword)}
                     disabled={deleting === kw.id}
                     className="h-7 px-2"
+                    title="Delete this keyword"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
