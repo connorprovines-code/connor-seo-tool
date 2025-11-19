@@ -102,11 +102,15 @@ export default function KeywordResearchPage() {
       })
 
       if (!similarRes.ok) {
-        throw new Error('Failed to fetch similar keywords')
+        const errorData = await similarRes.json()
+        console.error('Similar keywords API error:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch similar keywords')
       }
 
       const similarData = await similarRes.json()
       console.log('Similar keywords API response:', similarData)
+      console.log('Ideas array:', similarData.ideas)
+      console.log('Total ideas:', similarData.total_ideas)
 
       // Parse metrics
       let metrics = {
