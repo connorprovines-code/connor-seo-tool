@@ -133,13 +133,13 @@ export async function POST(request: NextRequest) {
 
     // Create initial message
     console.log('[Chat API] Calling Claude API...')
-    console.log('[Chat API] Model: claude-3-5-sonnet-20241022')
+    console.log('[Chat API] Model: claude-sonnet-4-5-20250929')
     console.log('[Chat API] Tools count:', tools.length)
 
     let response
     try {
       response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         tools,
         messages,
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
 
       // Continue conversation with tool result
       response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         tools,
         messages: [
