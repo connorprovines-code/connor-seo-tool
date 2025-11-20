@@ -39,18 +39,26 @@ export default async function ProjectsPage() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <Folder className="h-8 w-8 text-primary" />
+                    <Folder className="h-8 w-8 text-primary flex-shrink-0" />
                   </div>
-                  <CardTitle className="mt-4">{project.name}</CardTitle>
-                  <CardDescription>{project.domain}</CardDescription>
+                  <CardTitle className="mt-4 truncate" title={project.name}>
+                    {project.name}
+                  </CardTitle>
+                  <CardDescription className="truncate" title={project.domain}>
+                    {project.domain}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>{project.target_location}</span>
-                    <span>{new Date(project.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center justify-between text-sm text-gray-500 gap-2">
+                    <span className="truncate" title={project.target_location}>
+                      {project.target_location}
+                    </span>
+                    <span className="whitespace-nowrap flex-shrink-0">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
