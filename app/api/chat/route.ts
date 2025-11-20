@@ -157,13 +157,23 @@ export async function POST(request: NextRequest) {
 
     // Handle tool use loop
     while (response.stop_reason === 'tool_use') {
-      const toolUse: any = response.content.find((block: any) => block.type === 'tool_use')
-      if (!toolUse || toolUse.type !== 'tool_use') break
+      // Find all tool_use blocks in the response
+      const toolUses = response.content.filter((block: any) => block.type === 'tool_use')
+      if (toolUses.length === 0) break
 
-      // Execute the tool
-      const toolResult = await executeTools(toolUse.name, toolUse.input, supabase)
+      // Execute all tools in parallel
+      const toolResults = await Promise.all(
+        toolUses.map(async (toolUse: any) => {
+          const result = await executeTools(toolUse.name, toolUse.input, supabase)
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: toolUse.id,
+            content: JSON.stringify(result),
+          }
+        })
+      )
 
-      // Continue conversation with tool result
+      // Continue conversation with all tool results
       response = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
@@ -173,13 +183,7 @@ export async function POST(request: NextRequest) {
           { role: 'assistant', content: response.content },
           {
             role: 'user',
-            content: [
-              {
-                type: 'tool_result',
-                tool_use_id: toolUse.id,
-                content: JSON.stringify(toolResult),
-              },
-            ],
+            content: toolResults,
           },
         ],
       })
