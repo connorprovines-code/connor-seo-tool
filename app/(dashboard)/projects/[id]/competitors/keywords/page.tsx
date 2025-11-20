@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,7 +32,11 @@ interface CompetitorKeyword {
 
 export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPageProps) {
   const { id: projectId } = use(params)
-  const [domain, setDomain] = useState('')
+  const searchParams = useSearchParams()
+  const urlDomain = searchParams.get('domain') || ''
+  const urlAction = searchParams.get('action') || ''
+
+  const [domain, setDomain] = useState(urlDomain)
   const [loading, setLoading] = useState(false)
   const [loadingGap, setLoadingGap] = useState(false)
   const [keywords, setKeywords] = useState<CompetitorKeyword[]>([])
@@ -44,6 +49,22 @@ export default function CompetitorKeywordsPage({ params }: CompetitorKeywordsPag
     competitorKeywordsCount: number
   } | null>(null)
   const [addingKeyword, setAddingKeyword] = useState<string | null>(null)
+  const [autoAnalyzed, setAutoAnalyzed] = useState(false)
+
+  // Auto-analyze if domain is in URL
+  useEffect(() => {
+    if (urlDomain && !autoAnalyzed && !analyzedDomain) {
+      setAutoAnalyzed(true)
+      handleAnalyze()
+    }
+  }, [urlDomain])
+
+  // Auto-trigger gap analysis if action=gap in URL
+  useEffect(() => {
+    if (urlAction === 'gap' && analyzedDomain && !gapAnalysis) {
+      handleGapAnalysis()
+    }
+  }, [analyzedDomain, urlAction])
 
   const handleAnalyze = async () => {
     if (!domain.trim()) {

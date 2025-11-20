@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Competitor } from '@/types'
-import { Trash2, ExternalLink } from 'lucide-react'
+import { Trash2, ExternalLink, Search, TrendingUp, Target } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 interface CompetitorListProps {
@@ -54,13 +55,17 @@ export default function CompetitorList({ competitors, projectId }: CompetitorLis
     }
   }
 
+  const cleanDomain = (domain: string) => {
+    return domain.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {competitors.map((competitor) => (
         <Card key={competitor.id}>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center justify-between">
-              <span className="truncate">{competitor.name || competitor.domain}</span>
+              <span className="truncate">{competitor.name || cleanDomain(competitor.domain)}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -72,17 +77,17 @@ export default function CompetitorList({ competitors, projectId }: CompetitorLis
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Domain:</span>
                 <a
-                  href={competitor.domain}
+                  href={`https://${cleanDomain(competitor.domain)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline flex items-center"
                 >
                   <span className="truncate max-w-[150px]">
-                    {competitor.domain.replace(/^https?:\/\//, '')}
+                    {cleanDomain(competitor.domain)}
                   </span>
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </a>
@@ -91,10 +96,28 @@ export default function CompetitorList({ competitors, projectId }: CompetitorLis
                 <span className="text-gray-500">Added:</span>
                 <span>{new Date(competitor.created_at).toLocaleDateString()}</span>
               </div>
-            </div>
-            <div className="mt-4 pt-4 border-t">
-              <div className="text-xs text-gray-500 text-center">
-                Competitor analysis coming soon
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t space-y-2">
+                <Link
+                  href={`/projects/${projectId}/competitors/keywords?domain=${encodeURIComponent(cleanDomain(competitor.domain))}`}
+                  className="block"
+                >
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Search className="h-4 w-4 mr-2" />
+                    View Their Keywords
+                  </Button>
+                </Link>
+
+                <Link
+                  href={`/projects/${projectId}/competitors/keywords?domain=${encodeURIComponent(cleanDomain(competitor.domain))}&action=gap`}
+                  className="block"
+                >
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Target className="h-4 w-4 mr-2" />
+                    Keyword Gap Analysis
+                  </Button>
+                </Link>
               </div>
             </div>
           </CardContent>
