@@ -133,13 +133,27 @@ export async function POST(request: NextRequest) {
 
     // Create initial message
     console.log('[Chat API] Calling Claude API...')
-    let response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
-      tools,
-      messages,
-    })
-    console.log('[Chat API] Claude response received, stop_reason:', response.stop_reason)
+    console.log('[Chat API] Model: claude-3-5-sonnet-20241022')
+    console.log('[Chat API] Tools count:', tools.length)
+
+    let response
+    try {
+      response = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 4096,
+        tools,
+        messages,
+      })
+      console.log('[Chat API] Claude response received, stop_reason:', response.stop_reason)
+    } catch (apiError: any) {
+      console.error('[Chat API] Anthropic API error:', apiError)
+      console.error('[Chat API] Error details:', {
+        message: apiError.message,
+        status: apiError.status,
+        type: apiError.type,
+      })
+      throw new Error(`Anthropic API failed: ${apiError.message}`)
+    }
 
     // Handle tool use loop
     while (response.stop_reason === 'tool_use') {
