@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     // Create initial message
     let response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 4096,
       tools,
       messages,
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 
       // Continue conversation with tool result
       response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         tools,
         messages: [
