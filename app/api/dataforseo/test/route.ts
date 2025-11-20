@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dataForSEO } from '@/lib/dataforseo/client'
 
+nexport const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const { keyword = 'seo' } = await request.json()
