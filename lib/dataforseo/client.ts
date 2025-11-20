@@ -218,7 +218,7 @@ export class DataForSEOClient {
     ])
   }
 
-  // Get keywords for a specific domain (competitor analysis)
+  // Get keywords for a specific domain (competitor analysis) - RANKED KEYWORDS
   async getKeywordsForSite(
     target: string,
     locationCode: number = 2840,
@@ -233,19 +233,15 @@ export class DataForSEOClient {
     const {
       limit = 100,
       offset = 0,
-      filters = [
-        // Only return keywords where the domain actually ranks in top 100
-        ['ranked_serp_element.serp_item.rank_absolute', '>', 0],
-        'and',
-        ['ranked_serp_element.serp_item.rank_absolute', '<=', 100],
-      ],
-      orderBy = ['keyword_info.search_volume,desc'],
+      filters,
+      orderBy = ['keyword_data.keyword_info.search_volume,desc'],
       includeSerp = false,
     } = options
 
-    console.log(`Calling keywords_for_site for domain: "${target}", location: ${locationCode}, limit: ${limit}`)
+    console.log(`Calling ranked_keywords for domain: "${target}", location: ${locationCode}, limit: ${limit}`)
 
-    return this.makeRequest('/dataforseo_labs/google/keywords_for_site/live', [
+    // Use ranked_keywords endpoint - this returns keywords the domain actually ranks for
+    return this.makeRequest('/dataforseo_labs/google/ranked_keywords/live', [
       {
         target,
         location_code: locationCode,
@@ -254,7 +250,7 @@ export class DataForSEOClient {
         offset,
         filters,
         order_by: orderBy,
-        include_serp_info: includeSerp,
+        item_types: ['organic'], // Only get organic rankings
       },
     ])
   }

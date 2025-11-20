@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       includeSerp: false,
     })
 
-    console.log('DataForSEO Keywords For Site response:', JSON.stringify(result, null, 2))
+    console.log('DataForSEO Ranked Keywords response:', JSON.stringify(result, null, 2))
 
     if (!result.tasks || !result.tasks[0]?.result) {
       console.error('No keywords found for domain:', result)
@@ -68,14 +68,14 @@ export async function POST(request: NextRequest) {
     await supabase.from('api_usage').insert({
       user_id: user.id,
       api_name: 'dataforseo',
-      endpoint: 'keywords_for_site',
+      endpoint: 'ranked_keywords',
       credits_used: 1,
       request_data: { domain: cleanDomain, locationCode, limit },
     })
 
     // Log first item to debug structure
     if (keywords.length > 0) {
-      console.log('First keyword item structure:', JSON.stringify(keywords[0], null, 2))
+      console.log('First ranked keyword item:', JSON.stringify(keywords[0], null, 2))
     }
 
     return NextResponse.json({
@@ -83,12 +83,12 @@ export async function POST(request: NextRequest) {
       total_count: taskResult?.total_count || 0,
       items_count: keywords.length,
       keywords: keywords.map((item: any) => ({
-        keyword: item.keyword || '',
+        keyword: item.keyword_data?.keyword || '',
         position: item.ranked_serp_element?.serp_item?.rank_absolute || null,
-        search_volume: item.keyword_info?.search_volume || 0,
-        competition: item.keyword_info?.competition || null,
-        cpc: item.keyword_info?.cpc || 0,
-        keyword_difficulty: item.keyword_properties?.keyword_difficulty || null,
+        search_volume: item.keyword_data?.keyword_info?.search_volume || 0,
+        competition: item.keyword_data?.keyword_info?.competition || null,
+        cpc: item.keyword_data?.keyword_info?.cpc || 0,
+        keyword_difficulty: item.keyword_data?.keyword_properties?.keyword_difficulty || null,
         url: item.ranked_serp_element?.serp_item?.url || null,
         title: item.ranked_serp_element?.serp_item?.title || null,
         etv: item.impressions_info?.etv || 0,
