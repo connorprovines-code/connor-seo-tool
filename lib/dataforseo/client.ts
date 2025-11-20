@@ -234,7 +234,7 @@ export class DataForSEOClient {
       limit = 100,
       offset = 0,
       filters,
-      orderBy = ['keyword_data.keyword_info.search_volume,desc'],
+      orderBy = ['ranked_serp_element.serp_item.rank_group,asc'], // Sort by rank position instead of volume
       includeSerp = false,
     } = options
 
@@ -251,6 +251,7 @@ export class DataForSEOClient {
         filters,
         order_by: orderBy,
         item_types: ['organic'], // Only get organic rankings
+        ignore_synonyms: false, // Include similar keywords
       },
     ])
   }
