@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
 
     // Handle tool use loop
     while (response.stop_reason === 'tool_use') {
-      const toolUse = response.content.find((block) => block.type === 'tool_use')
+      const toolUse: any = response.content.find((block: any) => block.type === 'tool_use')
       if (!toolUse || toolUse.type !== 'tool_use') break
 
       // Execute the tool
