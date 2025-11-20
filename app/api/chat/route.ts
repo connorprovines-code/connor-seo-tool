@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     // Handle tool use loop
     while (response.stop_reason === 'tool_use') {
       // Find all tool_use blocks in the response
-      const toolUses = response.content.filter((block: any) => block.type === 'tool_use')
+      const toolUses: any[] = response.content.filter((block: any) => block.type === 'tool_use')
       if (toolUses.length === 0) break
 
       // Execute all tools in parallel
