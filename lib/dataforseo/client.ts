@@ -233,8 +233,13 @@ export class DataForSEOClient {
     const {
       limit = 100,
       offset = 0,
-      filters,
-      orderBy = ['keyword_info.search_volume,desc'], // Fixed: removed 'keyword_data.' prefix
+      filters = [
+        // Only return keywords where the domain actually ranks in top 100
+        ['ranked_serp_element.serp_item.rank_absolute', '>', 0],
+        'and',
+        ['ranked_serp_element.serp_item.rank_absolute', '<=', 100],
+      ],
+      orderBy = ['keyword_info.search_volume,desc'],
       includeSerp = false,
     } = options
 
