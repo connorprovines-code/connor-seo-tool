@@ -14,6 +14,12 @@ export class DataForSEOClient {
   }
 
   async makeRequest(endpoint: string, data: any): Promise<any> {
+    console.log('[DataForSEO] Request:', {
+      endpoint,
+      url: `${this.baseUrl}${endpoint}`,
+      data: JSON.stringify(data, null, 2),
+    })
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -24,6 +30,15 @@ export class DataForSEOClient {
     })
 
     const result = await response.json()
+
+    console.log('[DataForSEO] Response:', {
+      endpoint,
+      status: response.status,
+      statusText: response.statusText,
+      statusCode: result.status_code,
+      statusMessage: result.status_message,
+      tasksCount: result.tasks?.length,
+    })
 
     if (!response.ok) {
       console.error('DataForSEO API Error:', {
