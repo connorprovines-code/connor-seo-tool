@@ -96,14 +96,18 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Chat API] Request received')
+
     // Check if API key is configured
     if (!process.env.ANTHROPIC_API_KEY) {
-      console.error('ANTHROPIC_API_KEY is not configured')
+      console.error('[Chat API] ANTHROPIC_API_KEY is not configured')
       return NextResponse.json(
         { error: 'AI Chat is not configured. Please add ANTHROPIC_API_KEY to your environment variables.' },
         { status: 500 }
       )
     }
+
+    console.log('[Chat API] API key present')
 
     const supabase = await createClient()
     const {
@@ -111,10 +115,14 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      console.error('[Chat API] No user found')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('[Chat API] User authenticated:', user.id)
+
     const { messages } = await request.json()
+    console.log('[Chat API] Messages received:', messages?.length || 0)
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -124,12 +132,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create initial message
+    console.log('[Chat API] Calling Claude API...')
     let response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 4096,
       tools,
       messages,
     })
+    console.log('[Chat API] Claude response received, stop_reason:', response.stop_reason)
 
     // Handle tool use loop
     while (response.stop_reason === 'tool_use') {
@@ -165,19 +175,27 @@ export async function POST(request: NextRequest) {
     const textContent = response.content.find((block) => block.type === 'text')
     const assistantMessage = textContent && textContent.type === 'text' ? textContent.text : ''
 
-    // Save messages to database
-    await supabase.from('chat_messages').insert([
-      {
-        user_id: user.id,
-        role: 'user',
-        content: messages[messages.length - 1].content,
-      },
-      {
-        user_id: user.id,
-        role: 'assistant',
-        content: assistantMessage,
-      },
-    ])
+    // Save messages to database (non-blocking, don't fail chat if this fails)
+    try {
+      const { error: saveError } = await supabase.from('chat_messages').insert([
+        {
+          user_id: user.id,
+          role: 'user',
+          content: messages[messages.length - 1].content,
+        },
+        {
+          user_id: user.id,
+          role: 'assistant',
+          content: assistantMessage,
+        },
+      ])
+
+      if (saveError) {
+        console.error('Failed to save chat history (non-critical):', saveError)
+      }
+    } catch (saveErr) {
+      console.error('Chat history save error (non-critical):', saveErr)
+    }
 
     return NextResponse.json({
       message: assistantMessage,
