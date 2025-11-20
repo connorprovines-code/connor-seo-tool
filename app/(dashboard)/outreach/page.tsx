@@ -35,57 +35,85 @@ export default async function OutreachPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Outreach Campaigns</h1>
-          <p className="text-gray-500 mt-1">Manage your backlink outreach campaigns</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/outreach/templates">
-            <Button variant="outline">
-              <Mail className="mr-2 h-4 w-4" />
-              Email Templates
-            </Button>
-          </Link>
-          <Link href="/outreach/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Campaign
-            </Button>
-          </Link>
+          <h1 className="text-3xl font-bold text-gray-900">Link Building Outreach</h1>
+          <p className="text-gray-500 mt-1">Automated backlink outreach campaigns powered by n8n</p>
         </div>
       </div>
 
+      {/* Quick Start - Create New Campaign */}
+      {projects && projects.length > 0 && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900">Start New Campaign</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Select a project to find outreach opportunities
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {projects?.map((project: any) => (
+                  <Link key={project.id} href={`/projects/${project.id}/outreach`}>
+                    <Button variant="outline" size="sm">
+                      {project.name}
+                    </Button>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {campaigns && campaigns.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
           {campaigns.map((campaign: any) => (
-            <Link key={campaign.id} href={`/outreach/${campaign.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <Mail className="h-8 w-8 text-primary" />
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        campaign.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : campaign.status === 'paused'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {campaign.status}
-                    </span>
+            <Card key={campaign.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900">{campaign.campaign_name}</h3>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          campaign.status === 'running'
+                            ? 'bg-green-100 text-green-800'
+                            : campaign.status === 'completed'
+                            ? 'bg-blue-100 text-blue-800'
+                            : campaign.status === 'paused'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {campaign.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                      <span><strong>Keyword:</strong> {campaign.keyword}</span>
+                      <span><strong>Project:</strong> {campaign.projects?.name}</span>
+                      <span>{new Date(campaign.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex gap-4 text-sm">
+                      <span className="text-gray-600">{campaign.target_count} targets</span>
+                      {campaign.sent_count > 0 && (
+                        <span className="text-blue-600">{campaign.sent_count} sent</span>
+                      )}
+                      {campaign.replied_count > 0 && (
+                        <span className="text-green-600">{campaign.replied_count} replied</span>
+                      )}
+                      {campaign.link_acquired_count > 0 && (
+                        <span className="text-purple-600 font-medium">{campaign.link_acquired_count} links!</span>
+                      )}
+                    </div>
                   </div>
-                  <CardTitle className="mt-4">{campaign.name}</CardTitle>
-                  <CardDescription>
-                    {campaign.projects?.name || 'Unknown Project'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>Created {new Date(campaign.created_at).toLocaleDateString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  <Link href={`/projects/${campaign.project_id}/outreach`}>
+                    <Button variant="outline" size="sm">
+                      View Project
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : (
@@ -94,14 +122,16 @@ export default async function OutreachPage() {
             <Mail className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns yet</h3>
             <p className="text-sm text-gray-500 mb-6 text-center max-w-sm">
-              Create your first outreach campaign to start building backlinks
+              Create your first link building campaign to find backlink opportunities
             </p>
-            <Link href="/outreach/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Campaign
-              </Button>
-            </Link>
+            {projects && projects.length > 0 && (
+              <Link href={`/projects/${projects[0].id}/outreach`}>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Start First Campaign
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       )}

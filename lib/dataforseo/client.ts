@@ -281,6 +281,26 @@ export class DataForSEOClient {
       },
     ])
   }
+
+  // Get referring domains (for link intersect analysis)
+  async getReferringDomains(target: string, limit: number = 1000) {
+    return this.makeRequest('/backlinks/referring_domains/live', [
+      {
+        target,
+        limit,
+        order_by: ['rank,desc'], // Highest authority first
+      },
+    ])
+  }
+
+  // Get domain metrics (for scoring targets)
+  async getDomainMetrics(target: string) {
+    return this.makeRequest('/dataforseo_labs/google/domain_metrics/live', [
+      {
+        target,
+      },
+    ])
+  }
 }
 
 export const dataForSEO = new DataForSEOClient()
