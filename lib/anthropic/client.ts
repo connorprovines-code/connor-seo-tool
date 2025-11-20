@@ -92,4 +92,26 @@ export const tools: Anthropic.Tool[] = [
       required: ['project_id'],
     },
   },
+  {
+    name: 'analyze_page_seo',
+    description: 'Analyze on-page SEO for a specific URL using Puppeteer. Returns title, meta description, headings, word count, image alt text analysis, internal/external links, schema markup, and keyword optimization if target keyword provided. Works with JavaScript-heavy sites (React, Vue, etc).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The full URL to analyze (e.g., https://example.com/page)',
+        },
+        project_id: {
+          type: 'string',
+          description: 'Optional project ID to associate this audit with',
+        },
+        target_keyword: {
+          type: 'string',
+          description: 'Optional keyword to analyze keyword optimization (checks if keyword appears in title, H1, meta, URL, and calculates density)',
+        },
+      },
+      required: ['url'],
+    },
+  },
 ]

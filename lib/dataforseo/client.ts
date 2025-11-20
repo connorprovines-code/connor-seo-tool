@@ -234,7 +234,7 @@ export class DataForSEOClient {
       limit = 100,
       offset = 0,
       filters,
-      orderBy = ['keyword_data.keyword_info.search_volume,desc'],
+      orderBy = ['keyword_info.search_volume,desc'], // Fixed: removed 'keyword_data.' prefix
       includeSerp = false,
     } = options
 

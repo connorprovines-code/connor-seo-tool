@@ -89,6 +89,111 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
 
       return analysis
 
+    case 'analyze_page_seo':
+      // Directly call the analyze function instead of HTTP request
+      const { analyzePage: analyzePageFn } = await import('@/lib/puppeteer/browser')
+
+      try {
+        const pageData = await analyzePageFn(toolInput.url, toolInput.target_keyword)
+
+        // Process the data similar to API endpoint
+        const currentDomain = new URL(toolInput.url).hostname
+        const internalLinks = pageData.links.filter((link: any) => {
+          try {
+            const linkDomain = new URL(link.href).hostname
+            return linkDomain === currentDomain || linkDomain === `www.${currentDomain}` || linkDomain === currentDomain.replace('www.', '')
+          } catch {
+            return !link.href.startsWith('http')
+          }
+        })
+        const externalLinks = pageData.links.filter((link: any) => !internalLinks.includes(link))
+
+        const schemaTypes: string[] = []
+        pageData.schemaScripts.forEach((schema: any) => {
+          if (schema && schema['@type']) {
+            const type = Array.isArray(schema['@type']) ? schema['@type'][0] : schema['@type']
+            if (type && !schemaTypes.includes(type)) {
+              schemaTypes.push(type)
+            }
+          }
+        })
+
+        const imagesWithoutAlt = pageData.images.filter((img: any) => !img.alt).length
+
+        // Save to database
+        const auditData = {
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          project_id: toolInput.project_id || null,
+          url: toolInput.url,
+          title: pageData.title,
+          meta_description: pageData.metaDescription,
+          h1: pageData.h1,
+          h2: pageData.h2,
+          canonical_url: pageData.canonicalUrl,
+          word_count: pageData.wordCount,
+          paragraph_count: pageData.paragraphCount,
+          images_total: pageData.images.length,
+          images_without_alt: imagesWithoutAlt,
+          images_data: pageData.images.slice(0, 50),
+          internal_links_count: internalLinks.length,
+          external_links_count: externalLinks.length,
+          links_data: {
+            internal: internalLinks.slice(0, 20).map((l: any) => ({ href: l.href, text: l.text })),
+            external: externalLinks.slice(0, 20).map((l: any) => ({ href: l.href, text: l.text })),
+          },
+          has_meta_viewport: pageData.hasMetaViewport,
+          has_meta_robots: pageData.hasMetaRobots,
+          meta_robots: pageData.metaRobots,
+          has_og_tags: pageData.hasOgTags,
+          has_twitter_tags: pageData.hasTwitterTags,
+          has_schema_markup: schemaTypes.length > 0,
+          schema_types: schemaTypes,
+          target_keyword: toolInput.target_keyword || null,
+          keyword_in_title: pageData.keyword?.inTitle || false,
+          keyword_in_h1: pageData.keyword?.inH1 || false,
+          keyword_in_meta: pageData.keyword?.inMeta || false,
+          keyword_in_url: pageData.keyword?.inUrl || false,
+          keyword_density: pageData.keyword?.density || 0,
+        }
+
+        await supabase.from('page_audits').insert(auditData)
+
+        return {
+          url: toolInput.url,
+          title: pageData.title,
+          metaDescription: pageData.metaDescription,
+          wordCount: pageData.wordCount,
+          imagesTotal: pageData.images.length,
+          imagesWithoutAlt,
+          internalLinks: internalLinks.length,
+          externalLinks: externalLinks.length,
+          hasSchemaMarkup: schemaTypes.length > 0,
+          schemaTypes,
+          keywordAnalysis: toolInput.target_keyword ? {
+            keyword: toolInput.target_keyword,
+            inTitle: pageData.keyword?.inTitle,
+            inH1: pageData.keyword?.inH1,
+            inMeta: pageData.keyword?.inMeta,
+            inUrl: pageData.keyword?.inUrl,
+            density: pageData.keyword?.density,
+          } : null,
+          issues: [
+            ...(imagesWithoutAlt > 0 ? [`${imagesWithoutAlt} images missing alt text`] : []),
+            ...(!pageData.metaDescription ? ['Missing meta description'] : []),
+            ...(!pageData.hasMetaViewport ? ['Missing viewport meta tag'] : []),
+            ...(pageData.h1.length === 0 ? ['No H1 heading found'] : []),
+            ...(pageData.h1.length > 1 ? ['Multiple H1 headings (should be one)'] : []),
+            ...(!pageData.canonicalUrl ? ['No canonical URL set'] : []),
+            ...(schemaTypes.length === 0 ? ['No Schema.org markup found'] : []),
+          ],
+        }
+      } catch (err: any) {
+        return {
+          error: `Failed to analyze page: ${err.message}`,
+          details: err.toString(),
+        }
+      }
+
     default:
       return { error: 'Unknown tool' }
   }
