@@ -26,36 +26,63 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log(`Fetching backlinks for domain: ${domain}`)
+
     // Call DataForSEO API
     const result = await dataForSEO.getBacklinks(domain)
 
-    if (!result.tasks || !result.tasks[0] || !result.tasks[0].result) {
+    console.log('DataForSEO backlinks result:', {
+      hasTasks: !!result.tasks,
+      tasksLength: result.tasks?.length,
+      firstTaskHasResult: !!result.tasks?.[0]?.result,
+      statusCode: result.status_code,
+      statusMessage: result.status_message,
+    })
+
+    if (!result.tasks || !result.tasks[0]) {
       return NextResponse.json(
-        { error: 'No results from DataForSEO' },
+        { error: 'No tasks returned from DataForSEO', details: result },
         { status: 500 }
       )
     }
 
-    const backlinks = result.tasks[0].result[0]?.items || []
+    if (!result.tasks[0].result || result.tasks[0].result.length === 0) {
+      console.log('No backlinks found for domain')
+      return NextResponse.json({
+        success: true,
+        count: 0,
+        message: 'No backlinks found for this domain',
+      })
+    }
 
-    // Save backlinks to database
-    for (const backlink of backlinks.slice(0, 100)) {
-      // Limit to 100
-      await supabase.from('backlinks').upsert(
-        {
-          project_id: projectId,
-          source_url: backlink.url_from,
-          target_url: backlink.url_to,
-          anchor_text: backlink.anchor,
-          domain_rank: backlink.rank,
-          link_type: backlink.dofollow ? 'dofollow' : 'nofollow',
-          first_seen: backlink.first_seen || new Date().toISOString(),
-          last_seen: new Date().toISOString(),
-          is_lost: false,
-        },
-        {
-          onConflict: 'source_url,target_url',
-        }
+    const backlinks = result.tasks[0].result[0]?.items || []
+    console.log(`Found ${backlinks.length} backlinks`)
+
+    // Save backlinks to database in batches
+    const backlinkData = backlinks.slice(0, 100).map((backlink: any) => ({
+      project_id: projectId,
+      source_url: backlink.url_from,
+      target_url: backlink.url_to,
+      anchor_text: backlink.anchor,
+      domain_rank: backlink.rank,
+      link_type: backlink.dofollow ? 'dofollow' : 'nofollow',
+      first_seen: backlink.first_seen || new Date().toISOString(),
+      last_seen: new Date().toISOString(),
+      is_lost: false,
+    }))
+
+    const { error: upsertError } = await supabase.from('backlinks').upsert(
+      backlinkData,
+      {
+        onConflict: 'source_url,target_url',
+      }
+    )
+
+    if (upsertError) {
+      console.error('Database upsert error:', upsertError)
+      return NextResponse.json(
+        { error: 'Failed to save backlinks to database', details: upsertError.message },
+        { status: 500 }
       )
     }
 
@@ -68,14 +95,16 @@ export async function POST(request: NextRequest) {
       request_data: { domain },
     })
 
+    console.log(`Successfully saved ${backlinkData.length} backlinks`)
+
     return NextResponse.json({
       success: true,
-      count: backlinks.length,
+      count: backlinkData.length,
     })
   } catch (error: any) {
     console.error('Backlinks error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch backlinks' },
+      { error: error.message || 'Failed to fetch backlinks', stack: error.stack },
       { status: 500 }
     )
   }
