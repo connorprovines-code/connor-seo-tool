@@ -5,42 +5,113 @@ import { anthropic, tools } from '@/lib/anthropic/client'
 // Tool execution functions
 async function executeTools(toolName: string, toolInput: any, supabase: any) {
   switch (toolName) {
-    case 'get_user_projects':
+    case 'get_user_projects': {
       const { data: projects } = await supabase
         .from('projects')
         .select('*')
         .order('created_at', { ascending: false })
       return projects || []
+    }
 
-    case 'get_project_keywords':
+    case 'get_project_details': {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', toolInput.project_id)
+        .single()
+
+      if (!project) return { error: 'Project not found' }
+
+      const [keywordCount, backlinkCount, competitorCount] = await Promise.all([
+        supabase.from('keywords').select('id', { count: 'exact', head: true }).eq('project_id', toolInput.project_id),
+        supabase.from('backlinks').select('id', { count: 'exact', head: true }).eq('project_id', toolInput.project_id).eq('is_lost', false),
+        supabase.from('competitors').select('id', { count: 'exact', head: true }).eq('project_id', toolInput.project_id),
+      ])
+
+      return {
+        ...project,
+        keyword_count: keywordCount.count || 0,
+        backlink_count: backlinkCount.count || 0,
+        competitor_count: competitorCount.count || 0,
+      }
+    }
+
+    case 'get_project_keywords': {
       const { data: keywords } = await supabase
         .from('keywords')
         .select('*')
         .eq('project_id', toolInput.project_id)
+        .order('search_volume', { ascending: false })
       return keywords || []
+    }
 
-    case 'get_ranking_history':
+    case 'get_ranking_history': {
       const days = toolInput.days || 30
       const daysAgo = new Date()
       daysAgo.setDate(daysAgo.getDate() - days)
 
       const { data: rankings } = await supabase
         .from('rankings')
-        .select('*')
+        .select('*, keywords(keyword)')
         .eq('keyword_id', toolInput.keyword_id)
         .gte('checked_at', daysAgo.toISOString())
         .order('checked_at', { ascending: true })
       return rankings || []
+    }
 
-    case 'get_backlinks':
-      const { data: backlinks } = await supabase
+    case 'get_latest_rankings': {
+      const { data: keywords } = await supabase
+        .from('keywords')
+        .select('id, keyword, search_volume')
+        .eq('project_id', toolInput.project_id)
+
+      if (!keywords || keywords.length === 0) return []
+
+      const keywordIds = keywords.map((k: any) => k.id)
+      const { data: allRankings } = await supabase
+        .from('rankings')
+        .select('*')
+        .in('keyword_id', keywordIds)
+        .order('checked_at', { ascending: false })
+
+      const latestByKeyword = new Map()
+      allRankings?.forEach((r: any) => {
+        if (!latestByKeyword.has(r.keyword_id)) {
+          latestByKeyword.set(r.keyword_id, r)
+        }
+      })
+
+      return keywords.map((kw: any) => ({
+        ...kw,
+        latest_ranking: latestByKeyword.get(kw.id) || null,
+      }))
+    }
+
+    case 'get_backlinks': {
+      const includeLost = toolInput.include_lost || false
+      let query = supabase
         .from('backlinks')
         .select('*')
         .eq('project_id', toolInput.project_id)
-        .eq('is_lost', false)
-      return backlinks || []
+        .order('domain_rank', { ascending: false, nullsFirst: false })
 
-    case 'get_gsc_data':
+      if (!includeLost) {
+        query = query.eq('is_lost', false)
+      }
+
+      const { data: backlinks } = await query
+      return backlinks || []
+    }
+
+    case 'get_competitors': {
+      const { data: competitors } = await supabase
+        .from('competitors')
+        .select('*')
+        .eq('project_id', toolInput.project_id)
+      return competitors || []
+    }
+
+    case 'get_gsc_data': {
       const gscDays = toolInput.days || 30
       const gscDaysAgo = new Date()
       gscDaysAgo.setDate(gscDaysAgo.getDate() - gscDays)
@@ -52,9 +123,9 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
         .gte('date', gscDaysAgo.toISOString().split('T')[0])
         .order('date', { ascending: false })
       return gscData || []
+    }
 
-    case 'analyze_keyword_performance':
-      // Get keywords with their latest rankings
+    case 'analyze_keyword_performance': {
       const { data: kwds } = await supabase
         .from('keywords')
         .select('*')
@@ -68,7 +139,6 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
         .in('keyword_id', keywordIds)
         .order('checked_at', { ascending: false })
 
-      // Calculate stats
       const latestRankings = new Map()
       allRankings?.forEach((r: any) => {
         if (!latestRankings.has(r.keyword_id)) {
@@ -76,18 +146,121 @@ async function executeTools(toolName: string, toolInput: any, supabase: any) {
         }
       })
 
-      const analysis = {
+      const rankedKeywords = Array.from(latestRankings.values())
+
+      return {
         total_keywords: kwds?.length || 0,
         tracked_keywords: latestRankings.size,
-        average_position: latestRankings.size > 0
-          ? Array.from(latestRankings.values()).reduce((sum, r) => sum + r.rank_position, 0) / latestRankings.size
-          : 0,
-        top_3: Array.from(latestRankings.values()).filter(r => r.rank_position <= 3).length,
-        top_10: Array.from(latestRankings.values()).filter(r => r.rank_position <= 10).length,
-        keywords: kwds,
+        average_position: rankedKeywords.length > 0
+          ? (rankedKeywords.reduce((sum, r) => sum + r.rank_position, 0) / rankedKeywords.length).toFixed(1)
+          : 'N/A',
+        top_3: rankedKeywords.filter(r => r.rank_position <= 3).length,
+        top_10: rankedKeywords.filter(r => r.rank_position <= 10).length,
+        top_20: rankedKeywords.filter(r => r.rank_position <= 20).length,
+        not_ranking: (kwds?.length || 0) - latestRankings.size,
+        total_search_volume: kwds?.reduce((sum: number, k: any) => sum + (k.search_volume || 0), 0) || 0,
+      }
+    }
+
+    case 'analyze_backlink_profile': {
+      const { data: backlinks } = await supabase
+        .from('backlinks')
+        .select('*')
+        .eq('project_id', toolInput.project_id)
+
+      if (!backlinks || backlinks.length === 0) {
+        return { message: 'No backlinks found for this project' }
       }
 
-      return analysis
+      const activeBacklinks = backlinks.filter((b: any) => !b.is_lost)
+      const lostBacklinks = backlinks.filter((b: any) => b.is_lost)
+
+      const referringDomains = new Set(
+        activeBacklinks.map((b: any) => {
+          try { return new URL(b.source_url).hostname } catch { return b.source_url }
+        })
+      )
+
+      const anchorTexts = activeBacklinks
+        .map((b: any) => b.anchor_text || '[no anchor]')
+        .reduce((acc: any, anchor: string) => {
+          acc[anchor] = (acc[anchor] || 0) + 1
+          return acc
+        }, {})
+
+      const topAnchors = Object.entries(anchorTexts)
+        .sort((a: any, b: any) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([anchor, count]) => ({ anchor, count }))
+
+      return {
+        total_backlinks: backlinks.length,
+        active_backlinks: activeBacklinks.length,
+        lost_backlinks: lostBacklinks.length,
+        referring_domains: referringDomains.size,
+        dofollow_count: activeBacklinks.filter((b: any) => b.link_type === 'dofollow').length,
+        nofollow_count: activeBacklinks.filter((b: any) => b.link_type === 'nofollow').length,
+        dofollow_ratio: activeBacklinks.length > 0
+          ? ((activeBacklinks.filter((b: any) => b.link_type === 'dofollow').length / activeBacklinks.length) * 100).toFixed(1) + '%'
+          : 'N/A',
+        top_anchors: topAnchors,
+      }
+    }
+
+    case 'get_seo_summary': {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', toolInput.project_id)
+        .single()
+
+      if (!project) return { error: 'Project not found' }
+
+      const [keywordsResult, backlinksResult, rankingsResult] = await Promise.all([
+        supabase.from('keywords').select('*').eq('project_id', toolInput.project_id),
+        supabase.from('backlinks').select('*').eq('project_id', toolInput.project_id).eq('is_lost', false),
+        supabase.from('rankings').select('*').eq('project_id', toolInput.project_id).order('checked_at', { ascending: false }),
+      ])
+
+      const keywords = keywordsResult.data || []
+      const backlinks = backlinksResult.data || []
+      const rankings = rankingsResult.data || []
+
+      const latestRankings = new Map()
+      rankings.forEach((r: any) => {
+        if (!latestRankings.has(r.keyword_id)) {
+          latestRankings.set(r.keyword_id, r)
+        }
+      })
+      const rankedKeywords = Array.from(latestRankings.values())
+
+      const referringDomains = new Set(
+        backlinks.map((b: any) => {
+          try { return new URL(b.source_url).hostname } catch { return b.source_url }
+        })
+      )
+
+      return {
+        project: { name: project.name, domain: project.domain, target_location: project.target_location },
+        keywords: {
+          total: keywords.length,
+          total_search_volume: keywords.reduce((sum: number, k: any) => sum + (k.search_volume || 0), 0),
+        },
+        rankings: {
+          tracked: latestRankings.size,
+          average_position: rankedKeywords.length > 0
+            ? (rankedKeywords.reduce((sum, r) => sum + r.rank_position, 0) / rankedKeywords.length).toFixed(1)
+            : 'N/A',
+          top_3: rankedKeywords.filter(r => r.rank_position <= 3).length,
+          top_10: rankedKeywords.filter(r => r.rank_position <= 10).length,
+        },
+        backlinks: {
+          total: backlinks.length,
+          referring_domains: referringDomains.size,
+          dofollow: backlinks.filter((b: any) => b.link_type === 'dofollow').length,
+        },
+      }
+    }
 
     case 'analyze_page_seo':
       // Directly call the analyze function instead of HTTP request

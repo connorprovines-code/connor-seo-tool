@@ -269,13 +269,24 @@ export class DataForSEOClient {
     ])
   }
 
+
+  // Helper to clean domain targets - removes protocol and www
+  private cleanTarget(target: string): string {
+    return target
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+  }
+
   // Get backlinks for a domain
-  async getBacklinks(target: string, mode: 'as_is' | 'one_per_domain' = 'as_is') {
+  async getBacklinks(target: string, mode: 'as_is' | 'one_per_domain' | 'one_per_anchor' = 'as_is', limit: number = 1000) {
     return this.makeRequest('/backlinks/backlinks/live', [
       {
-        target,
+        target: this.cleanTarget(target),
         mode,
-        limit: 1000,
+        limit,
+        include_subdomains: true,
+        backlinks_status_type: 'live',
       },
     ])
   }
@@ -284,7 +295,8 @@ export class DataForSEOClient {
   async getBacklinkSummary(target: string) {
     return this.makeRequest('/backlinks/summary/live', [
       {
-        target,
+        target: this.cleanTarget(target),
+        include_subdomains: true,
       },
     ])
   }
@@ -293,7 +305,7 @@ export class DataForSEOClient {
   async getCompetitors(target: string) {
     return this.makeRequest('/backlinks/competitors/live', [
       {
-        target,
+        target: this.cleanTarget(target),
         limit: 10,
       },
     ])
@@ -303,9 +315,10 @@ export class DataForSEOClient {
   async getReferringDomains(target: string, limit: number = 1000) {
     return this.makeRequest('/backlinks/referring_domains/live', [
       {
-        target,
+        target: this.cleanTarget(target),
         limit,
-        order_by: ['rank,desc'], // Highest authority first
+        order_by: ['rank,desc'],
+        include_subdomains: true,
       },
     ])
   }
@@ -314,7 +327,7 @@ export class DataForSEOClient {
   async getDomainMetrics(target: string) {
     return this.makeRequest('/dataforseo_labs/google/domain_metrics/live', [
       {
-        target,
+        target: this.cleanTarget(target),
       },
     ])
   }
