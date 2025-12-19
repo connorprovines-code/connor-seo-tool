@@ -7,6 +7,13 @@ export class DataForSEOClient {
   constructor(login?: string, password?: string) {
     this.login = login || process.env.DATAFORSEO_LOGIN || ''
     this.password = password || process.env.DATAFORSEO_PASSWORD || ''
+
+    // Log credential status (not the actual values)
+    console.log('[DataForSEO] Client initialized:', {
+      hasLogin: !!this.login,
+      hasPassword: !!this.password,
+      loginLength: this.login.length,
+    })
   }
 
   private getAuthHeader(): string {

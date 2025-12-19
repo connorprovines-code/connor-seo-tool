@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     try {
       result = await dataForSEO.getBacklinks(domain)
     } catch (apiError: any) {
-      console.error('[Backlinks API] DataForSEO error:', apiError.message)
+      console.error('[Backlinks API] DataForSEO error:', apiError.message, apiError.stack)
       return NextResponse.json(
         { error: 'DataForSEO API error', details: apiError.message },
         { status: 502 }
